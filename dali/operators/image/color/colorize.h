@@ -9,7 +9,6 @@
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
 // limitations under the License.
 
 #include <vector>
@@ -36,10 +35,16 @@
 
 namespace dali {
 
-// TODO(hugo) Implement GPU version
-class ColorizeCpu : public Operator<CPUBackend> {
+template <typename Backend>
+class ColorizeBase : public Operator<Backend> {
  public:
-  explicit ColorizeCpu(const OpSpec &spec) : Operator<CPUBackend>(spec) {
+  ~ColorizeBase() override = default;
+
+ protected:
+  mat3x3 M;
+  const vec<3, float> zeros = {0, 0, 0};
+
+  explicit ColorizeBase(const OpSpec &spec) : Operator<Backend>(spec) {
     if (spec.ArgumentDefined("color")) {
       color_ = spec.GetRepeatedArgument<float>("color");
     } else {
@@ -47,20 +52,45 @@ class ColorizeCpu : public Operator<CPUBackend> {
     }
 
     DALI_ENFORCE(color_.size() == 3, "Color must be a vector of length 3");
+
+    this->M = {{{color_[0]/3, color_[0]/3, color_[0]/3},
+                {color_[1]/3, color_[1]/3, color_[1]/3},
+                {color_[2]/3, color_[2]/3, color_[2]/3}}};
   }
 
   bool CanInferOutputs() const override { return true; }
+
+  std::vector<float> color_;
+  kernels::KernelManager kernel_manager_;
+};
+
+class ColorizeCpu : public ColorizeBase<CPUBackend> {
+ public:
+  explicit ColorizeCpu(const OpSpec &spec) : ColorizeBase(spec) {}
+  ~ColorizeCpu() override = default;
 
  protected:
   template<typename DataType>
   using TheKernel = kernels::LinearTransformationCpu<DataType, DataType, 3, 3, 3>;
 
-  std::vector<float> color_;
-  kernels::KernelManager kernel_manager_;
+  using ColorizeBase<CPUBackend>::M;
 
   bool SetupImpl(std::vector<OutputDesc> &output_descs, const workspace_t<CPUBackend> &ws) override;
-
   void RunImpl(workspace_t<CPUBackend> &ws) override;
+};
+
+class ColorizeGpu : public ColorizeBase<GPUBackend> {
+ public:
+  explicit ColorizeGpu(const OpSpec &spec) : ColorizeBase(spec) {}
+  ~ColorizeGpu() override = default;
+
+ protected:
+  std::vector<mat3x3> tmatrices_;
+
+  using ColorizeBase<GPUBackend>::M;
+
+  bool SetupImpl(std::vector<OutputDesc> &output_descs, const workspace_t<GPUBackend> &ws) override;
+  void RunImpl(workspace_t<GPUBackend> &ws) override;
 };
 
 }  // namespace dali

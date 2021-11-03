@@ -72,10 +72,6 @@ void ColorizeCpu::RunImpl(workspace_t<CPUBackend> &ws) {
         kernels::KernelContext ctx;
         auto tvin = view<const DataType, 3>(input[sample_id]);
         auto tvout = view<DataType, 3>(output[sample_id]);
-        // TODO(hugo) Can this matrix be defined in a shorter way?
-        mat3x3 M = {{{color_[0]/3, color_[0]/3, color_[0]/3},
-                     {color_[1]/3, color_[1]/3, color_[1]/3},
-                     {color_[2]/3, color_[2]/3, color_[2]/3}}};
         kernel_manager_.Run<Kernel>(thread_id, thread_id, ctx, tvout, tvin, M, vec3(0, 0, 0));
       }, out_shape.tensor_size(sample_id));
     }
