@@ -54,4 +54,4 @@ BENCHMARK_REGISTER_F(OperatorBench, OneHotGPU)->Iterations(1000)
 ->UseRealTime()
 ->Apply(OneHotGPUArgs);
 
-}  // namespace dali 
+}  // namespace dali
