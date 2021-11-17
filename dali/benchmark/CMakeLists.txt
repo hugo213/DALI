@@ -34,6 +34,7 @@ if (BUILD_BENCHMARK)
     "${CMAKE_CURRENT_SOURCE_DIR}/preemphasis_bench.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/thread_pool_bench.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/normal_distribution_gpu_bench.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/transpose_bench.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/slice_bench.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/shapes_bench.cc"
     "${CMAKE_CURRENT_SOURCE_DIR}/resize_bench.cc"
