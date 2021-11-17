@@ -20,7 +20,7 @@ namespace dali {
 
 static void GaussianBlurGPUArgs(benchmark::internal::Benchmark *b) {
   for (int batch_size = 256; batch_size >= 1; batch_size /= 2) {
-    for (int H = 2000; H >= 500; H /= 2) {
+    for (int H = 1000; H >= 500; H /= 2) {
       int W = H, C = 3;
       b->Args({batch_size, H, W, C});
     }
@@ -36,7 +36,7 @@ BENCHMARK_DEFINE_F(OperatorBench, GaussianBlurGPU)(benchmark::State& st) {
 
   this->RunGPU<uint8_t>(
     st,
-    OpSpec("Flip")
+    OpSpec("GaussianBlur")
       .AddArg("max_batch_size", batch_size)
       .AddArg("num_threads", 1)
       .AddArg("device", "gpu")
