@@ -35,7 +35,7 @@ BENCHMARK_DEFINE_F(OperatorBench, MaxGPU)(benchmark::State& st) {
 
   this->RunGPU<uint8_t>(
     st,
-    OpSpec("Crop")
+    OpSpec("Max")
       .AddArg("max_batch_size", batch_size)
       .AddArg("num_threads", 1)
       .AddArg("device", "gpu")
