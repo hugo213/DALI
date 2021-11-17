@@ -70,7 +70,10 @@ BENCHMARK_DEFINE_F(OperatorBench, OldColorTwistGPU)(benchmark::State& st) {
 BENCHMARK_REGISTER_F(OperatorBench, ColorTwistGPU)->Iterations(1000)
 ->Unit(benchmark::kMicrosecond)
 ->UseRealTime()
-->Ranges({{1, 128}, {128, 2048}});
+->ArgsProduct({
+  benchmark::CreateRange(1, 256, 2),
+  {500, 1000, 2000}
+});
 
 BENCHMARK_REGISTER_F(OperatorBench, OldColorTwistGPU)->Iterations(1000)
 ->Unit(benchmark::kMicrosecond)
