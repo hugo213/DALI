@@ -29,7 +29,7 @@ BENCHMARK_DEFINE_F(OperatorBench, CastGPU)(benchmark::State& st) {
       .AddArg("max_batch_size", batch_size)
       .AddArg("num_threads", 1)
       .AddArg("device", "gpu")
-      .AddArg("dtype", DALI_UINT8),
+      .AddArg("dtype", DALI_FLOAT),
     batch_size, H, W);
 }
 
@@ -38,7 +38,7 @@ BENCHMARK_REGISTER_F(OperatorBench, CastGPU)->Iterations(100)
 ->UseRealTime()
 ->ArgsProduct({
   benchmark::CreateRange(1, 256, 2),
-  {500, 1000, 2000},
+  {500, 1000},
 });
 
 }  // namespace dali
