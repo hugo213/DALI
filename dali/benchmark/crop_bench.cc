@@ -55,7 +55,7 @@ BENCHMARK_REGISTER_F(OperatorBench, CropCPU)->Iterations(1000)
 ->Apply(CropCPUArgs);
 
 static void CropGPUArgs(benchmark::internal::Benchmark *b) {
-  for (int batch_size = 128; batch_size >= 1; batch_size /= 4) {
+  for (int batch_size = 256; batch_size >= 1; batch_size /= 2) {
     for (int H = 2000; H >= 500; H /= 2) {
       int W = H, C = 3;
       int crop_h = static_cast<float>(5*H/10);
