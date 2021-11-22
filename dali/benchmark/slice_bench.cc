@@ -29,8 +29,8 @@ static void SliceGPUArgs(benchmark::internal::Benchmark *b) {
 BENCHMARK_DEFINE_F(OperatorBench, SliceGPU)(benchmark::State& st) {
   int batch_size = st.range(0);
   int H = st.range(1);
-  std::vector<int> start = {0, 0};
-  std::vector<int> end = {0, 0};
+  std::vector<int> start = {H/4, H/4};
+  std::vector<int> end = {H*3/4, H*3/4};
 
   this->RunGPU<uint8_t>(
     st,
