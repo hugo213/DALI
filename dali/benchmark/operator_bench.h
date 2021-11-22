@@ -117,9 +117,13 @@ class OperatorBench : public DALIBenchmark {
     Setup<TensorList<GPUBackend>>(op_ptr, op_spec, ws, batch_size);
     op_ptr->Run(ws);
     CUDA_CALL(cudaStreamSynchronize(0));
+    unsigned i = 0;
     for (auto _ : st) {
       op_ptr->Run(ws);
-      CUDA_CALL(cudaStreamSynchronize(0));
+
+      if (++i == st.max_iterations) {
+        CUDA_CALL(cudaStreamSynchronize(0));
+      }
 
       int num_batches = st.iterations() + 1;
       st.counters["FPS"] = benchmark::Counter(batch_size * num_batches,
