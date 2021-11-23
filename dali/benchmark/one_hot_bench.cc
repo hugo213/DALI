@@ -20,11 +20,13 @@ namespace dali {
 
 static void OneHotGPUArgs(benchmark::internal::Benchmark *b) {
   for (int batch_size = 256; batch_size >= 1; batch_size /= 2) {
-    for (int H = 2000; H >= 500; H /= 2) {
+    for (int H = 1000; H >= 500; H /= 2) {
       int W = H;
-      
-      b->Args({batch_size, H, W, 1});
-      b->Args({batch_size, H, W, 2});
+      int AXIS = 1;
+      int NUM_CLASSES = 2;      
+      b->Args({batch_size, H, W, AXIS, NUM_CLASSES});
+      AXIS = 2;
+      b->Args({batch_size, H, W, AXIS, NUM_CLASSES});
     }
   }
 }
@@ -34,6 +36,7 @@ BENCHMARK_DEFINE_F(OperatorBench, OneHotGPU)(benchmark::State& st) {
   int H = st.range(1);
   int W = st.range(2);
   int axis = st.range(3);
+  int num_classes = st.range(4);
 
   this->RunGPU<uint8_t>(
     st,
@@ -42,7 +45,8 @@ BENCHMARK_DEFINE_F(OperatorBench, OneHotGPU)(benchmark::State& st) {
       .AddArg("num_threads", 1)
       .AddArg("device", "gpu")
       .AddArg("output_type", DALI_RGB)
-      .AddArg("axis", axis),
+      .AddArg("axis", axis)
+      .AddArg("num_classes", num_classes),
     batch_size, H, W);
 }
 
