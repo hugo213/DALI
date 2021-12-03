@@ -198,19 +198,6 @@ class SliceGPU {
   static constexpr int64_t kMaxBlockSize = 64 * kBlockDim;
   int64 blockSize;
 
-  // TODO: This should be moved to some utils probably
-  int64_t getSMCount() {
-    int nDevices;
-    int64_t count = 0;
-    CUDA_CALL(cudaGetDeviceCount(&nDevices));
-    for (int i = 0; i < nDevices; i++) {
-      cudaDeviceProp prop;
-      CUDA_CALL(cudaGetDeviceProperties(&prop, i));
-      count += prop.multiProcessorCount;
-    }
-    return count;
-  }
-
   int64_t block_count_ = 0;
 
  public:
@@ -259,7 +246,7 @@ class SliceGPU {
       total_volume += volume(args.shape);
     }
 
-    auto minBlocks = 4 * getSMCount();
+    auto minBlocks = 4 * GetSMCount();
     blockSize = kMaxBlockSize;
     while (total_volume / blockSize < minBlocks && blockSize > kMinBlockSize) {
       blockSize /= 2;
