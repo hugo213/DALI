@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2017-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,12 @@
 #ifndef DALI_OPERATORS_READER_FILE_READER_OP_H_
 #define DALI_OPERATORS_READER_FILE_READER_OP_H_
 
-#include <utility>
 #include <string>
+#include <utility>
 #include <vector>
-#include "dali/operators/reader/reader_op.h"
+
 #include "dali/operators/reader/loader/file_label_loader.h"
+#include "dali/operators/reader/reader_op.h"
 
 namespace dali {
 

@@ -307,9 +307,9 @@ class DummyPresizeOpCPU : public Operator<CPUBackend> {
   }
 
   void RunImpl(HostWorkspace &ws) override {
-    const auto &input = ws.InputRef<CPUBackend>(0);
+    const auto &input = ws.Input<CPUBackend>(0);
     int num_samples = input.shape().num_samples();
-    auto &output = ws.OutputRef<CPUBackend>(0);
+    auto &output = ws.Output<CPUBackend>(0);
     auto tmp_size = output.capacity();
     output.set_type<size_t>();
     output.Resize(uniform_list_shape(num_samples, std::vector<int64_t>{2}));
@@ -332,9 +332,9 @@ class DummyPresizeOpGPU : public Operator<GPUBackend> {
   }
 
   void RunImpl(DeviceWorkspace &ws) override {
-    const auto &input = ws.InputRef<GPUBackend>(0);
+    const auto &input = ws.Input<GPUBackend>(0);
     int num_samples = input.shape().num_samples();
-    auto &output = ws.OutputRef<GPUBackend>(0);
+    auto &output = ws.Output<GPUBackend>(0);
     output.set_type<size_t>();
     size_t tmp_size[2] = {output.capacity(), input.capacity()};
     output.Resize(uniform_list_shape(num_samples, std::vector<int64_t>{2}));
@@ -358,9 +358,9 @@ class DummyPresizeOpMixed : public Operator<MixedBackend> {
 
   using Operator<MixedBackend>::Run;
   void Run(MixedWorkspace &ws) override {
-    auto &input = ws.InputRef<CPUBackend>(0);
+    auto &input = ws.Input<CPUBackend>(0);
     int num_samples = input.shape().num_samples();
-    auto &output = ws.OutputRef<GPUBackend>(0);
+    auto &output = ws.Output<GPUBackend>(0);
     output.set_type<size_t>();
     size_t tmp_size[2] = {output.capacity(), input.capacity()};
     output.Resize(uniform_list_shape(num_samples, std::vector<int64_t>{2}));

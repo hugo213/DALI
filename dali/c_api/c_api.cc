@@ -481,10 +481,10 @@ void daliOutputCopy(daliPipelineHandle *pipe_handle, void *dst, int output_idx,
 
   auto &type_info = dali::TypeTable::GetTypeInfo(dali::DALIDataType::DALI_UINT8);
   if (ws->OutputIsType<dali::CPUBackend>(output_idx)) {
-    CopyToExternal(dst, dst_mem_kind, ws->OutputRef<dali::CPUBackend>(output_idx),
+    CopyToExternal(dst, dst_mem_kind, ws->Output<dali::CPUBackend>(output_idx),
                    stream, use_copy_kernel);
   } else {
-    CopyToExternal(dst, dst_mem_kind, ws->OutputRef<dali::GPUBackend>(output_idx),
+    CopyToExternal(dst, dst_mem_kind, ws->Output<dali::GPUBackend>(output_idx),
                    stream, use_copy_kernel);
   }
   if (sync) {
@@ -506,10 +506,10 @@ void daliOutputCopySamples(daliPipelineHandle *pipe_handle, void **dsts, int out
 
   auto &type_info = dali::TypeTable::GetTypeInfo(dali::DALIDataType::DALI_UINT8);
   if (ws->OutputIsType<dali::CPUBackend>(output_idx)) {
-    CopyToExternal(dsts, dst_mem_kind, ws->OutputRef<dali::CPUBackend>(output_idx),
+    CopyToExternal(dsts, dst_mem_kind, ws->Output<dali::CPUBackend>(output_idx),
                    stream, use_copy_kernel);
   } else {
-    CopyToExternal(dsts, dst_mem_kind, ws->OutputRef<dali::GPUBackend>(output_idx),
+    CopyToExternal(dsts, dst_mem_kind, ws->Output<dali::GPUBackend>(output_idx),
                    stream, use_copy_kernel);
   }
   if (sync) {

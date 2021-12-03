@@ -1143,7 +1143,9 @@ PYBIND11_MODULE(backend_impl, m) {
 
   ExposeBufferPolicyFunctions(m);
 
-  m.def("LoadLibrary", &PluginManager::LoadLibrary);
+  m.def("LoadLibrary", &PluginManager::LoadLibrary,
+    py::arg("lib_path"),
+    py::arg("global_symbols") = false);
 
   m.def("GetCxx11AbiFlag", &GetCxx11AbiFlag);
 
@@ -1174,6 +1176,7 @@ PYBIND11_MODULE(backend_impl, m) {
              return py::memoryview::from_buffer(ptr, {shm->size()}, {sizeof(uint8_t)});
            })
       .def("resize", &SharedMem::resize)
+      .def("close_handle", &SharedMem::close_handle)
       .def("close", &SharedMem::close);
 
 #endif

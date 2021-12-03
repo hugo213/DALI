@@ -76,7 +76,7 @@ if (BUILD_DALI_PIPELINE)
 endif()
 
 if (BUILD_NVML)
-  target_link_libraries(dali PRIVATE $<TARGET_OBJECTS:dynlink_nvml>)
+  target_link_libraries(dali PRIVATE dynlink_nvml)
 endif(BUILD_NVML)
 
 if (BUILD_CUFILE)
@@ -93,7 +93,7 @@ if (BUILD_DALI_PIPELINE AND BUILD_TEST)
   target_link_libraries(dali_test PUBLIC dali dali_core dali_kernels dali_operators ${DALI_LIBS} gtest)
   target_link_libraries(dali_test PRIVATE dynlink_cuda ${CUDART_LIB})
   if (BUILD_NVML)
-    target_link_libraries(dali_test PRIVATE $<TARGET_OBJECTS:dynlink_nvml>)
+    target_link_libraries(dali_test PRIVATE dynlink_nvml)
   endif(BUILD_NVML)
   if (BUILD_CUFILE)
     target_link_libraries(dali_test PRIVATE dynlink_cufile)
@@ -193,5 +193,11 @@ if (BUILD_PYTHON)
   add_custom_command(
     TARGET install_headers
     COMMAND cp -rL "${PROJECT_SOURCE_DIR}/third_party/libcudacxx/include/." "${PROJECT_BINARY_DIR}/${DALI_INCLUDE_DIR}/"
+  )
+
+  # Copy boost/preprocessor include files
+  add_custom_command(
+    TARGET install_headers
+    COMMAND cp -rL "${PROJECT_SOURCE_DIR}/third_party/boost/preprocessor/include/." "${PROJECT_BINARY_DIR}/${DALI_INCLUDE_DIR}/"
   )
 endif()

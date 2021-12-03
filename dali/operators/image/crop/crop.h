@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,15 +37,15 @@ class Crop : public SliceBase<Backend> {
     crop_attr_(spec) {}
 
  protected:
-  void ProcessCroppingAttrs(const workspace_t<Backend> &ws) override {
-    const auto &input = ws.template InputRef<Backend>(0);
+  void ProcessCroppingAttrs(const OpSpec &spec, const workspace_t<Backend> &ws) override {
+    const auto &input = ws.template Input<Backend>(0);
     const TensorLayout in_layout = input.GetLayout();
     DALI_ENFORCE(in_layout.ndim() == input.shape().sample_dim());
     DALI_ENFORCE(ImageLayoutInfo::HasChannel(in_layout) &&
       (ImageLayoutInfo::IsImage(in_layout) || VideoLayoutInfo::IsVideo(in_layout)),
       "Unexpected data layout");
 
-    crop_attr_.ProcessArguments(ws);
+    crop_attr_.ProcessArguments(spec, ws);
   }
 
   const CropWindowGenerator &GetCropWindowGenerator(std::size_t data_idx) const override {

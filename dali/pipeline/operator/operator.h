@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2018, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2017-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -70,10 +70,10 @@ inline void CheckInputLayouts(const Workspace &ws, const OpSpec &spec) {
   auto &schema = spec.GetSchema();
   for (int i = 0; i < spec.NumRegularInput(); ++i) {
     if (ws.template InputIsType<CPUBackend>(i)) {
-      auto &input = ws.template InputRef<CPUBackend>(i);
+      auto &input = ws.template Input<CPUBackend>(i);
       (void) schema.GetInputLayout(i, input.shape().sample_dim(), input.GetLayout());
     } else if (ws.template InputIsType<GPUBackend>(i)) {
-      auto &input = ws.template InputRef<GPUBackend>(i);
+      auto &input = ws.template Input<GPUBackend>(i);
       (void) schema.GetInputLayout(i, input.shape().sample_dim(), input.GetLayout());
     } else {
       DALI_FAIL(make_string("Input ", i, " has an unknown backend"));
@@ -255,24 +255,24 @@ class Operator : public OperatorBase {};
 template <typename Workspace>
 TensorLayout GetInputLayout(Workspace& ws, int i) {
   if (ws.template InputIsType<CPUBackend>(i)) {
-    auto &in = ws.template InputRef<CPUBackend>(i);
+    auto &in = ws.template Input<CPUBackend>(i);
     return in.GetLayout();
   }
 
   assert(ws.template InputIsType<GPUBackend>(i));
-  auto &in = ws.template InputRef<GPUBackend>(i);
+  auto &in = ws.template Input<GPUBackend>(i);
   return in.GetLayout();
 }
 
 template <typename Workspace>
 TensorLayout GetOutputLayout(Workspace &ws, int i) {
   if (ws.template OutputIsType<CPUBackend>(i)) {
-    auto &out = ws.template OutputRef<CPUBackend>(i);
+    auto &out = ws.template Output<CPUBackend>(i);
     return out.GetLayout();
   }
 
   assert(ws.template OutputIsType<GPUBackend>(i));
-  auto &out = ws.template OutputRef<GPUBackend>(i);
+  auto &out = ws.template Output<GPUBackend>(i);
   return out.GetLayout();
 }
 
@@ -325,14 +325,14 @@ class Operator<CPUBackend> : public OperatorBase {
 
     auto curr_batch_size = ws.NumInput() > 0 ? ws.GetInputBatchSize(0) : max_batch_size_;
     for (int i = 0; i < ws.NumOutput(); i++) {
-      auto &output = ws.OutputRef<CPUBackend>(i);
+      auto &output = ws.Output<CPUBackend>(i);
       output.SetSize(curr_batch_size);
     }
     auto &thread_pool = ws.GetThreadPool();
     for (int data_idx = 0; data_idx < curr_batch_size; ++data_idx) {
       thread_pool.AddWork([this, &ws, data_idx](int tid) {
         SampleWorkspace sample;
-        ws.GetSample(&sample, data_idx, tid);
+        MakeSampleView(sample, ws, data_idx, tid);
         this->SetupSharedSampleParams(sample);
         this->RunImpl(sample);
       }, -data_idx);  // -data_idx for FIFO order

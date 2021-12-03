@@ -42,12 +42,16 @@ class EraseImplGpu : public OpImplBase<GPUBackend> {
  public:
   using EraseKernel = kernels::EraseGpu<T, Dims, channel_dim>;
 
-  explicit EraseImplGpu(const OpSpec &spec) : spec_(spec) {
+  /**
+   * @param spec  Pointer to a persistent OpSpec object,
+   *              which is guaranteed to be alive for the entire lifetime of this object
+   */
+  explicit EraseImplGpu(const OpSpec *spec) : spec_(*spec) {
     kmgr_.Resize<EraseKernel>(1, 1);
   }
 
   bool SetupImpl(std::vector<OutputDesc> &output_desc, const workspace_t<GPUBackend> &ws) override {
-    const auto &input = ws.template InputRef<GPUBackend>(0);
+    const auto &input = ws.template Input<GPUBackend>(0);
     auto layout = input.GetLayout();
     auto type = input.type();
     auto shape = input.shape();
@@ -65,8 +69,8 @@ class EraseImplGpu : public OpImplBase<GPUBackend> {
   };
 
   void RunImpl(workspace_t<GPUBackend> &ws) override {
-    const auto &input_ref = ws.template InputRef<GPUBackend>(0);
-    auto &output_ref = ws.template OutputRef<GPUBackend>(0);
+    const auto &input_ref = ws.template Input<GPUBackend>(0);
+    auto &output_ref = ws.template Output<GPUBackend>(0);
     output_ref.SetLayout(input_ref.GetLayout());
     auto input = view<const T, Dims>(input_ref);
     auto output = view<T, Dims>(output_ref);
@@ -111,17 +115,17 @@ class EraseImplGpu : public OpImplBase<GPUBackend> {
 template <>
 bool Erase<GPUBackend>::SetupImpl(std::vector<OutputDesc> &output_desc,
                                   const workspace_t<GPUBackend> &ws) {
-  const auto &input = ws.InputRef<GPUBackend>(0);
+  const auto &input = ws.Input<GPUBackend>(0);
   auto in_shape = input.shape();
   auto channel_dim = input.GetLayout().find('C');
   TYPE_SWITCH(input.type(), type2id, T, ERASE_SUPPORTED_TYPES, (
     VALUE_SWITCH(in_shape.sample_dim(), Dims, ERASE_SUPPORTED_NDIMS, (
       if (channel_dim == -1)
-        impl_ = std::make_unique<EraseImplGpu<T, Dims, -1>>(spec_);
+        impl_ = std::make_unique<EraseImplGpu<T, Dims, -1>>(&spec_);
       else if (channel_dim == 0)
-        impl_ = std::make_unique<EraseImplGpu<T, Dims, 0>>(spec_);
+        impl_ = std::make_unique<EraseImplGpu<T, Dims, 0>>(&spec_);
       else if (channel_dim == Dims-1)
-        impl_ = std::make_unique<EraseImplGpu<T, Dims, Dims-1>>(spec_);
+        impl_ = std::make_unique<EraseImplGpu<T, Dims, Dims-1>>(&spec_);
       else
         DALI_FAIL("Unsupported layout. Only 'no channel', "
                   "'channel first' and 'channel last' layouts are supported.");

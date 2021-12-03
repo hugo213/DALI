@@ -32,8 +32,8 @@ DALI_REGISTER_OPERATOR(Contrast, BrightnessContrastGpu, GPU);
 bool BrightnessContrastGpu::SetupImpl(std::vector<OutputDesc> &output_desc,
                                       const workspace_t<GPUBackend> &ws) {
   KMgrResize(num_threads_, max_batch_size_);
-  const auto &input = ws.template InputRef<GPUBackend>(0);
-  const auto &output = ws.template OutputRef<GPUBackend>(0);
+  const auto &input = ws.template Input<GPUBackend>(0);
+  const auto &output = ws.template Output<GPUBackend>(0);
   output_desc.resize(1);
   AcquireArguments(ws);
   int N = input.num_samples();

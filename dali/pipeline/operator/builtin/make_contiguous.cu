@@ -18,13 +18,13 @@
 namespace dali {
 
 void MakeContiguousMixed::Run(MixedWorkspace &ws) {
-  const auto& input = ws.template InputRef<CPUBackend>(0);
+  const auto& input = ws.template Input<CPUBackend>(0);
   int sample_dim = input[0].shape().sample_dim();
   size_t batch_size = input.num_samples();
   DALIDataType type = input.type();
 
   for (size_t i = 0; i < input.num_samples(); ++i) {
-    auto &sample = ws.Input<CPUBackend>(0, i);
+    auto &sample = ws.Input<CPUBackend>(0)[i];
     size_t sample_bytes = sample.nbytes();
     if (coalesced && sample_bytes > COALESCE_THRESHOLD)
       coalesced = false;

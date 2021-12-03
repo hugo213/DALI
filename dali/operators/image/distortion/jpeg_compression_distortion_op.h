@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ class JpegCompressionDistortion : public Operator<Backend> {
  protected:
   explicit JpegCompressionDistortion(const OpSpec &spec)
       : Operator<Backend>(spec),
-        spec_(spec),
         quality_arg_("quality", spec) {
   }
 
@@ -39,13 +38,15 @@ class JpegCompressionDistortion : public Operator<Backend> {
   }
 
   bool SetupImpl(std::vector<OutputDesc> &output_desc, const workspace_t<Backend> &ws) override {
-    const auto &input = ws.template InputRef<Backend>(0);
+    const auto &input = ws.template Input<Backend>(0);
     output_desc.resize(1);
     const auto &in_sh = input.shape();
-    assert(in_sh.sample_dim() == 3);  // should be check by the layout
+    assert(in_sh.sample_dim() == 3 || in_sh.sample_dim() == 4);  // should be check by the layout
     for (int s = 0; s < in_sh.num_samples(); s++) {
-      DALI_ENFORCE(in_sh.tensor_shape_span(s)[2] == 3,
-        make_string("Expected RGB samples with HWC layout, got shape: ", in_sh[s]));
+      DALI_ENFORCE(in_sh.tensor_shape_span(s).back() == 3,
+                   make_string("Invalid number of channels. Expected a channel-last layout, with 3 "
+                               "channels (RGB), got shape: ",
+                               in_sh[s]));
     }
 
     output_desc[0] = {in_sh, input.type()};
@@ -53,8 +54,10 @@ class JpegCompressionDistortion : public Operator<Backend> {
     return true;
   }
 
-  OpSpec spec_;
   ArgValue<int> quality_arg_;
+
+ private:
+  using Operator<Backend>::spec_;
 };
 
 }  // namespace dali

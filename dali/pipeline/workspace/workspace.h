@@ -141,24 +141,30 @@ class WorkspaceBase : public ArgumentWorkspace {
     gpu_outputs_index_.clear();
   }
 
+  /** @defgroup InputOutput Input and output APIs
+   * Functions used to access inputs and outputs of the operator in its implementation.
+   * The inputs are read-only while outputs can be modified.
+   * @{
+   */
+
+  /**
+   * @brief Returns the const reference to the input batch at the position `idx`.
+   *
+   * The operator implementation can use this function to access its inputs.
+   */
   template <typename Backend>
-  typename InputType<Backend>::element_type& InputRef(int idx) const {
+  const auto& Input(int idx) const {
     return *InputHandle(idx, Backend{});
   }
 
+  /**
+   * @brief Returns the mutable reference to the output batch at the position `idx`.
+   *
+   * The operator implementation can use this function to access its outputs.
+   */
   template <typename Backend>
-  typename OutputType<Backend>::element_type& OutputRef(int idx) const {
+  auto& Output(int idx) const {
     return *OutputHandle(idx, Backend{});
-  }
-
-  template <typename Backend>
-  const InputType<Backend>& InputPtr(int idx) const {
-    return InputHandle(idx, Backend{});
-  }
-
-  template <typename Backend>
-  const OutputType<Backend>& OutputPtr(int idx) const {
-    return OutputHandle(idx, Backend{});
   }
 
   /**
@@ -175,15 +181,56 @@ class WorkspaceBase : public ArgumentWorkspace {
     return output_index_map_.size();
   }
 
+
+  /** @} */  // end of InputOutput
+
+  /** @defgroup InputOutputInternal Internal API for input and output access
+   * Functions allowing mutable access to both inputs and outputs that should not be used in
+   * operator implementation.
+   * @{
+   */
+
+  /**
+   * @brief Returns the mutable reference to the input batch at the position `idx`.
+   *
+   * Intended only for executor and other internal APIs.
+   */
+  template <typename Backend>
+  auto& UnsafeMutableInput(int idx) const {
+    return *InputHandle(idx, Backend{});
+  }
+
+  /**
+   * @brief Returns the underlying handle to the input batch at the position `idx`.
+   *
+   * Intended only for executor and other internal APIs.
+   */
+  template <typename Backend>
+  const InputType<Backend>& InputPtr(int idx) const {
+    return InputHandle(idx, Backend{});
+  }
+
+  /**
+   * @brief Returns the underlying handle to the output batch at the position `idx`.
+   *
+   * Intended only for executor and other internal APIs.
+   */
+  template <typename Backend>
+  const OutputType<Backend>& OutputPtr(int idx) const {
+    return OutputHandle(idx, Backend{});
+  }
+
+  /** @} */  // end of InputOutputInternal
+
   /**
    * Returns shape of input at given index
    * @return TensorShape<> for SampleWorkspace, TensorListShape<> for other Workspaces
    */
   auto GetInputShape(int input_idx) const {
     if (InputIsType<GPUBackend>(input_idx)) {
-      return InputRef<GPUBackend>(input_idx).shape();
+      return Input<GPUBackend>(input_idx).shape();
     } else {
-      return InputRef<CPUBackend>(input_idx).shape();
+      return Input<CPUBackend>(input_idx).shape();
     }
   }
 
@@ -195,9 +242,9 @@ class WorkspaceBase : public ArgumentWorkspace {
     DALI_ENFORCE(input_idx >= 0 && input_idx < NumInput(),
                  make_string("Invalid input index: ", input_idx, "; while NumInput: ", NumInput()));
     if (InputIsType<GPUBackend>(input_idx)) {
-      return InputRef<GPUBackend>(input_idx).num_samples();
+      return Input<GPUBackend>(input_idx).num_samples();
     } else {
-      return InputRef<CPUBackend>(input_idx).num_samples();
+      return Input<CPUBackend>(input_idx).num_samples();
     }
   }
 
@@ -209,9 +256,9 @@ class WorkspaceBase : public ArgumentWorkspace {
     DALI_ENFORCE(input_idx >= 0 && input_idx < NumInput(),
                  make_string("Invalid input index: ", input_idx, "; while NumInput: ", NumInput()));
     if (InputIsType<GPUBackend>(input_idx)) {
-      return InputRef<GPUBackend>(input_idx).sample_dim();
+      return Input<GPUBackend>(input_idx).sample_dim();
     } else {
-      return InputRef<CPUBackend>(input_idx).sample_dim();
+      return Input<CPUBackend>(input_idx).sample_dim();
     }
   }
 

@@ -121,11 +121,15 @@ class GaussianBlurOpCpu : public OpImplBase<CPUBackend> {
   using Kernel = kernels::SeparableConvolutionCpu<Out, In, float, axes, has_channels>;
   static constexpr int ndim = Kernel::ndim;
 
-  explicit GaussianBlurOpCpu(const OpSpec& spec, const DimDesc& dim_desc)
-      : spec_(spec), dim_desc_(dim_desc) {}
+  /**
+   * @param spec  Pointer to a persistent OpSpec object,
+   *              which is guaranteed to be alive for the entire lifetime of this object
+   */
+  explicit GaussianBlurOpCpu(const OpSpec* spec, const DimDesc& dim_desc)
+      : spec_(*spec), dim_desc_(dim_desc) {}
 
   bool SetupImpl(std::vector<OutputDesc>& output_desc, const workspace_t<CPUBackend>& ws) override {
-    const auto& input = ws.template InputRef<CPUBackend>(0);
+    const auto& input = ws.template Input<CPUBackend>(0);
     int nsamples = input.num_samples();
     auto nthreads = ws.GetThreadPool().NumThreads();
 
@@ -151,8 +155,8 @@ class GaussianBlurOpCpu : public OpImplBase<CPUBackend> {
   }
 
   void RunImpl(workspace_t<CPUBackend>& ws) override {
-    const auto& input = ws.template InputRef<CPUBackend>(0);
-    auto& output = ws.template OutputRef<CPUBackend>(0);
+    const auto& input = ws.template Input<CPUBackend>(0);
+    auto& output = ws.template Output<CPUBackend>(0);
     output.SetLayout(input.GetLayout());
     auto in_shape = input.shape();
     auto& thread_pool = ws.GetThreadPool();
@@ -188,7 +192,7 @@ class GaussianBlurOpCpu : public OpImplBase<CPUBackend> {
   }
 
  private:
-  OpSpec spec_;
+  const OpSpec &spec_;
   DimDesc dim_desc_;
 
   kernels::KernelManager kmgr_;
@@ -204,27 +208,32 @@ class GaussianBlurOpCpu : public OpImplBase<CPUBackend> {
 template <>
 bool GaussianBlur<CPUBackend>::SetupImpl(std::vector<OutputDesc>& output_desc,
                                          const workspace_t<CPUBackend>& ws) {
-  const auto& input = ws.template InputRef<CPUBackend>(0);
+  const auto& input = ws.template Input<CPUBackend>(0);
   auto layout = input.GetLayout();
   auto dim_desc = ParseAndValidateDim(input.shape().sample_dim(), layout);
   dtype_ = dtype_ != DALI_NO_TYPE ? dtype_ : input.type();
   DALI_ENFORCE(dtype_ == input.type() || dtype_ == DALI_FLOAT,
                "Output data type must be same as input, FLOAT or skipped (defaults to input type)");
 
-  // clang-format off
-  TYPE_SWITCH(input.type(), type2id, In, GAUSSIAN_BLUR_CPU_SUPPORTED_TYPES, (
-    VALUE_SWITCH(dim_desc.usable_axes_count, AXES, GAUSSIAN_BLUR_SUPPORTED_AXES, (
-      VALUE_SWITCH(static_cast<int>(dim_desc.has_channels), HAS_CHANNELS, (0, 1), (
-        constexpr bool has_ch = HAS_CHANNELS;
-        if (dtype_ == input.type()) {
-          impl_ = std::make_unique<GaussianBlurOpCpu<In, In, AXES, has_ch>>(spec_, dim_desc);
-        } else {
-          impl_ = std::make_unique<GaussianBlurOpCpu<float, In, AXES, has_ch>>(spec_, dim_desc);
-        }
-      ), ()); // NOLINT, no other possible conversion
-    ), DALI_FAIL("Axis count out of supported range."));  // NOLINT
-  ), DALI_FAIL(make_string("Unsupported data type: ", input.type())));  // NOLINT
-  // clang-format on
+  if (!impl_ || impl_in_dtype_ != input.type() || impl_dim_desc_ != dim_desc) {
+    impl_in_dtype_ = input.type();
+    impl_dim_desc_ = dim_desc;
+
+    // clang-format off
+    TYPE_SWITCH(input.type(), type2id, In, GAUSSIAN_BLUR_CPU_SUPPORTED_TYPES, (
+      VALUE_SWITCH(dim_desc.usable_axes_count, AXES, GAUSSIAN_BLUR_SUPPORTED_AXES, (
+        VALUE_SWITCH(static_cast<int>(dim_desc.has_channels), HAS_CHANNELS, (0, 1), (
+          constexpr bool has_ch = HAS_CHANNELS;
+          if (dtype_ == input.type()) {
+            impl_ = std::make_unique<GaussianBlurOpCpu<In, In, AXES, has_ch>>(&spec_, dim_desc);
+          } else {
+            impl_ = std::make_unique<GaussianBlurOpCpu<float, In, AXES, has_ch>>(&spec_, dim_desc);
+          }
+        ), ()); // NOLINT, no other possible conversion
+      ), DALI_FAIL("Axis count out of supported range."));  // NOLINT
+    ), DALI_FAIL(make_string("Unsupported data type: ", input.type())));  // NOLINT
+    // clang-format on
+  }
 
   return impl_->SetupImpl(output_desc, ws);
 }

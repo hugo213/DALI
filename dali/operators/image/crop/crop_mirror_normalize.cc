@@ -42,8 +42,7 @@ Normalization takes the input images and produces the output by using the follow
        R"code(Output data type.
 
 Supported types: ``FLOAT``, ``FLOAT16``, ``INT8``, ``UINT8``.
-
-If not set, the input type is used.)code", DALI_FLOAT)
+)code", DALI_FLOAT)
   .DeprecateArgInFavorOf("output_dtype", "dtype")  // deprecated since 0.24dev
   .AddOptionalArg("output_layout",
     R"code(Tensor data layout for the output.)code", TensorLayout("CHW"))
@@ -54,10 +53,10 @@ If not set, the input type is used.)code", DALI_FLOAT)
     0, true)
   .AddOptionalArg("mean",
     R"code(Mean pixel values for image normalization.)code",
-    std::vector<float>{0.0f})
+    std::vector<float>{0.0f}, true)
   .AddOptionalArg("std",
     R"code(Standard deviation values for image normalization.)code",
-    std::vector<float>{1.0f})
+    std::vector<float>{1.0f}, true)
   .AddOptionalArg("scale", R"(The value by which the result is multiplied.
 
 This argument is useful when using integer outputs to improve dynamic range utilization.)",
@@ -76,7 +75,7 @@ bool CropMirrorNormalize<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_
                                                 const HostWorkspace &ws) {
   output_desc.resize(1);
   SetupCommonImpl(ws);
-  const auto &input = ws.InputRef<CPUBackend>(0);
+  const auto &input = ws.Input<CPUBackend>(0);
   auto in_shape = input.shape();
   int ndim = in_shape.sample_dim();
   int nsamples = in_shape.size();
@@ -103,8 +102,8 @@ bool CropMirrorNormalize<CPUBackend>::SetupImpl(std::vector<OutputDesc> &output_
 
 template <>
 void CropMirrorNormalize<CPUBackend>::RunImpl(HostWorkspace &ws) {
-  const auto &input = ws.InputRef<CPUBackend>(0);
-  auto &output = ws.OutputRef<CPUBackend>(0);
+  const auto &input = ws.Input<CPUBackend>(0);
+  auto &output = ws.Output<CPUBackend>(0);
   output.SetLayout(output_layout_);
   auto in_shape = input.shape();
   auto out_shape = output.shape();

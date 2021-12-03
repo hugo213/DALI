@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,15 +28,28 @@
 
 namespace dali {
 
-template class DLL_PUBLIC Executor<AOT_WS_Policy<UniformQueuePolicy>, UniformQueuePolicy>;
-template class DLL_PUBLIC Executor<AOT_WS_Policy<SeparateQueuePolicy>, SeparateQueuePolicy>;
-
 template <typename WorkspacePolicy, typename QueuePolicy>
 void Executor<WorkspacePolicy, QueuePolicy>::PreRun() {
   auto batch_size = InferBatchSize(batch_size_providers_);
   batch_sizes_cpu_.push(batch_size);
   batch_sizes_mixed_.push(batch_size);
   batch_sizes_gpu_.push(batch_size);
+}
+
+template <typename WorkspacePolicy, typename QueuePolicy>
+Executor<WorkspacePolicy, QueuePolicy>::~Executor() {
+  if (device_id_ != CPU_ONLY_DEVICE_ID) {
+    try {
+      DeviceGuard dg(device_id_);
+      if (mixed_op_stream_)
+        CUDA_DTOR_CALL(cudaStreamSynchronize(mixed_op_stream_));
+      if (gpu_op_stream_)
+        CUDA_DTOR_CALL(cudaStreamSynchronize(gpu_op_stream_));
+    } catch (const CUDAError &e) {
+      if (!e.is_unloading())
+        std::terminate();
+    }
+  }
 }
 
 template <typename WorkspacePolicy, typename QueuePolicy>
@@ -301,9 +314,11 @@ void Executor<WorkspacePolicy, QueuePolicy>::RunHelper(OpNode &op_node, Workspac
   for (int i = 0; i < spec.NumRegularInput(); i++) {
     bool had_empty_layout = false;
     if (ws.template InputIsType<CPUBackend>(i)) {
-      had_empty_layout = SetDefaultLayoutIfNeeded(ws.template InputRef<CPUBackend>(i), schema, i);
+      had_empty_layout =
+          SetDefaultLayoutIfNeeded(ws.template UnsafeMutableInput<CPUBackend>(i), schema, i);
     } else {
-      had_empty_layout = SetDefaultLayoutIfNeeded(ws.template InputRef<GPUBackend>(i), schema, i);
+      had_empty_layout =
+          SetDefaultLayoutIfNeeded(ws.template UnsafeMutableInput<GPUBackend>(i), schema, i);
     }
     if (had_empty_layout) empty_layout_in_idxs.push_back(i);
   }
@@ -318,9 +333,9 @@ void Executor<WorkspacePolicy, QueuePolicy>::RunHelper(OpNode &op_node, Workspac
     for (int i = 0; i < ws.NumOutput(); i++) {
       auto &desc = output_desc[i];
       if (ws.template OutputIsType<CPUBackend>(i)) {
-        ws.template OutputRef<CPUBackend>(i).Resize(desc.shape, desc.type);
+        ws.template Output<CPUBackend>(i).Resize(desc.shape, desc.type);
       } else {
-        ws.template OutputRef<GPUBackend>(i).Resize(desc.shape, desc.type);
+        ws.template Output<GPUBackend>(i).Resize(desc.shape, desc.type);
       }
     }
   } else {
@@ -334,10 +349,10 @@ void Executor<WorkspacePolicy, QueuePolicy>::RunHelper(OpNode &op_node, Workspac
 
   for (int i : empty_layout_in_idxs) {
     if (ws.template InputIsType<CPUBackend>(i)) {
-      auto &in = ws.template InputRef<CPUBackend>(i);
+      auto &in = ws.template UnsafeMutableInput<CPUBackend>(i);
       in.SetLayout({});
     } else {
-      auto &in = ws.template InputRef<GPUBackend>(i);
+      auto &in = ws.template UnsafeMutableInput<GPUBackend>(i);
       in.SetLayout({});
     }
   }
@@ -368,5 +383,8 @@ int Executor<WorkspacePolicy, QueuePolicy>::InferBatchSize(
   }
   return batch_size;
 }
+
+template class DLL_PUBLIC Executor<AOT_WS_Policy<UniformQueuePolicy>, UniformQueuePolicy>;
+template class DLL_PUBLIC Executor<AOT_WS_Policy<SeparateQueuePolicy>, SeparateQueuePolicy>;
 
 }  // namespace dali

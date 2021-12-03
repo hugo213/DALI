@@ -68,7 +68,7 @@ static void AppendToMap(ExecutorMetaMap &ret, ExecutorMetaMap &in_stats, std::mu
 class DLL_PUBLIC ExecutorBase {
  public:
   using ExecutorCallback = std::function<void(void)>;
-  DLL_PUBLIC virtual ~ExecutorBase() noexcept(false) {}
+  DLL_PUBLIC virtual ~ExecutorBase() {}
   DLL_PUBLIC virtual void Build(OpGraph *graph, vector<string> output_names) = 0;
   DLL_PUBLIC virtual void Init() = 0;
   DLL_PUBLIC virtual void RunCPU() = 0;
@@ -118,6 +118,8 @@ class DLL_PUBLIC Executor : public ExecutorBase, public WorkspacePolicy, public 
 
     stage_queue_depths_ = QueuePolicy::GetQueueSizes(prefetch_queue_depth);
   }
+
+  DLL_PUBLIC ~Executor() override;
 
   DLL_PUBLIC void EnableMemoryStats(bool enable_memory_stats = false) override {
     enable_memory_stats_ = enable_memory_stats;
@@ -195,12 +197,12 @@ class DLL_PUBLIC Executor : public ExecutorBase, public WorkspacePolicy, public 
           reserved_size = 0;
           max_reserved_size = 0;
           if (ws.template OutputIsType<CPUBackend>(i)) {
-            auto &out = ws.template OutputRef<CPUBackend>(i);
+            auto &out = ws.template Output<CPUBackend>(i);
             out_size = out.nbytes();
             reserved_size = out.capacity();
             GetMaxSizes(out, max_out_size, max_reserved_size);
           } else {
-            auto &out = ws.template OutputRef<GPUBackend>(i);
+            auto &out = ws.template Output<GPUBackend>(i);
             out_size = out.nbytes();
             reserved_size = out.capacity();
             GetMaxSizes(out, max_out_size, max_reserved_size);

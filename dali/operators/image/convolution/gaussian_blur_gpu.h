@@ -44,13 +44,17 @@ class GaussianBlurOpGpu : public OpImplBase<GPUBackend> {
       kernels::SeparableConvolutionGpu<Out, In, WindowType, axes, has_channels, is_sequence>;
   static constexpr int ndim = Kernel::ndim;
 
-  explicit GaussianBlurOpGpu(const OpSpec& spec, const DimDesc& dim_desc)
-      : spec_(spec), dim_desc_(dim_desc) {}
+  /**
+   * @param spec  Pointer to a persistent OpSpec object,
+   *              which is guaranteed to be alive for the entire lifetime of this object
+   */
+  explicit GaussianBlurOpGpu(const OpSpec* spec, const DimDesc& dim_desc)
+      : spec_(*spec), dim_desc_(dim_desc) {}
 
   bool SetupImpl(std::vector<OutputDesc>& output_desc, const workspace_t<GPUBackend>& ws) override {
     ctx_.gpu.stream = ws.stream();
 
-    const auto& input = ws.template InputRef<GPUBackend>(0);
+    const auto& input = ws.template Input<GPUBackend>(0);
     auto processed_shape = input.shape();
     int nsamples = processed_shape.num_samples();
     // If we are sequence-like, make sure that all sequence elements are compressed to first dim
@@ -69,22 +73,30 @@ class GaussianBlurOpGpu : public OpImplBase<GPUBackend> {
     for (auto &win_shape : window_shapes_) {
       win_shape.resize(nsamples);
     }
+    for (auto &windows : windows_tl_) {
+      windows.data.resize(nsamples);
+      windows.shape.resize(nsamples);
+    }
 
     kmgr_.template Resize<Kernel>(nthreads, nsamples);
 
     for (int i = 0; i < nsamples; i++) {
       params_[i] = ObtainSampleParams<axes>(i, spec_, ws);
-      windows_[i].PrepareWindows(params_[i]);
+      if (windows_[i].PrepareWindows(params_[i])) {
+        for (int axis = 0; axis < axes; axis++) {
+          window_shapes_[axis].set_tensor_shape(i, {params_[i].window_sizes[axis]});
+          windows_tl_[axis].data[i] = windows_[i].GetWindows()[axis].data;
+          windows_tl_[axis].shape.set_tensor_shape(i, windows_[i].GetWindows()[axis].shape);
+        }
+      }
     }
-    RepackAsTL<axes>(window_shapes_, params_);
-    RepackAsTL<axes>(windows_tl_, windows_);
     auto& req = kmgr_.Setup<Kernel>(0, ctx_, processed_shape.to_static<ndim>(), window_shapes_);
     return true;
   }
 
   void RunImpl(workspace_t<GPUBackend>& ws) override {
-    const auto& input = ws.template InputRef<GPUBackend>(0);
-    auto& output = ws.template OutputRef<GPUBackend>(0);
+    const auto& input = ws.template Input<GPUBackend>(0);
+    auto& output = ws.template Output<GPUBackend>(0);
     output.SetLayout(input.GetLayout());
 
     auto processed_shape = input.shape();
@@ -107,7 +119,7 @@ class GaussianBlurOpGpu : public OpImplBase<GPUBackend> {
   }
 
  private:
-  OpSpec spec_;
+  const OpSpec &spec_;
   DimDesc dim_desc_;
 
   kernels::KernelManager kmgr_;
@@ -127,7 +139,7 @@ class GaussianBlurOpGpu : public OpImplBase<GPUBackend> {
  * to allow for parallel compilation of underlying kernels.
  */
 template <typename Out, typename In>
-std::unique_ptr<OpImplBase<GPUBackend>> GetGaussianBlurGpuImpl(const OpSpec& spec,
+std::unique_ptr<OpImplBase<GPUBackend>> GetGaussianBlurGpuImpl(const OpSpec* spec,
                                                                DimDesc dim_desc) {
   std::unique_ptr<OpImplBase<GPUBackend>> result;
   VALUE_SWITCH(dim_desc.usable_axes_count, AXES, GAUSSIAN_BLUR_SUPPORTED_AXES, (
