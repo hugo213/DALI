@@ -44,6 +44,7 @@ class CastGPU : public Cast<GPUBackend> {
 
   GpuBlockSetup block_setup_;
   std::vector<kernels::CastSampleDesc> samples_;
+  DeviceBuffer<GpuBlockSetup::BlockDesc> blocks_dev_;
 
   USE_OPERATOR_MEMBERS();
 };
@@ -60,6 +61,7 @@ void CastGPU::PrepareBlocks(const DeviceWorkspace &ws) {
   auto collapsed_shape = collapse_dims<1>(input.shape(), collapse_groups);
 
   block_setup_.SetupBlocks(collapsed_shape, true);
+  blocks_dev_.from_host(block_setup_.Blocks(), ws.stream());
 }
 
 void CastGPU::RunImpl(DeviceWorkspace &ws) {
@@ -76,10 +78,8 @@ void CastGPU::RunImpl(DeviceWorkspace &ws) {
     samples_[sample_id].input = input.raw_tensor(sample_id);
   }
 
-  GpuBlockSetup::BlockDesc *blocks_dev;
   kernels::CastSampleDesc *samples_dev;
-  std::tie(blocks_dev, samples_dev) = scratchpad.ToContiguousGPU(ws.stream(),
-    block_setup_.Blocks(), samples_);
+  std::tie(samples_dev) = scratchpad.ToContiguousGPU(ws.stream(), samples_);
 
   DALIDataType itype = input.type();
   dim3 grid_dim = block_setup_.GridDim();
@@ -87,7 +87,7 @@ void CastGPU::RunImpl(DeviceWorkspace &ws) {
   TYPE_SWITCH(output_type_, type2id, OType, CAST_ALLOWED_TYPES, (
     TYPE_SWITCH(itype, type2id, IType, CAST_ALLOWED_TYPES, (
       kernels::BatchedCastKernel<OType, IType>
-          <<<grid_dim, block_dim, 0, ws.stream()>>>(samples_dev, blocks_dev);
+          <<<grid_dim, block_dim, 0, ws.stream()>>>(samples_dev, blocks_dev_.data());
     ), DALI_FAIL(make_string("Invalid input type: ", itype)););  // NOLINT(whitespace/parens)
   ), DALI_FAIL(make_string("Invalid output type: ", output_type_)););  // NOLINT(whitespace/parens)
 }
