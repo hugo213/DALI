@@ -37,6 +37,48 @@ __global__ void BatchedCastKernel(const CastSampleDesc *samples, const BlockDesc
   }
 }
 
+template<int MaxSamples>
+struct ExperimentalCastKernelParams {
+  CastSampleDesc samples[MaxSamples];
+  int sample_sizes[MaxSamples];
+  int first_block[MaxSamples]; // Id of first block assigned to each sample
+};
+
+/* This kernel doesn't need any memcopies, because all data needed (except for the samples themselves,
+ * of course) is passed as parameters. We pass SampleDescs via ExperimentalCastKernelParams.samples.
+ * We don't pass BlockDescs because they are redundant, instead we compute block info in the kernel
+ * itself. */
+template <typename OType, typename IType, int MaxSamples>
+__global__ void ExperimentalCastKernel(int nsamples, int block_volume_scale,
+                                       ExperimentalCastKernelParams<MaxSamples> params) {
+  CastSampleDesc sample;
+  int size;
+  int block_offset;
+
+  // We don't have sampleIdx, so we need to find our sample this way
+  #pragma unroll
+  for (int i = 0; i < MaxSamples; i++) {
+    if (i < nsamples && params.first_block[i] <= blockIdx.x) {
+      sample = params.samples[i];
+      size = params.sample_sizes[i];
+      block_offset = blockIdx.x - params.first_block[i];
+    }
+  }
+
+  // We also don't have BlockDesc, so we need to calculate block metadata in the kernel
+  int block_size = block_volume_scale * blockDim.x;
+  int block_start = block_offset * block_size;
+  int block_end = block_start + block_size;
+  if (block_end > size) block_end = size;
+
+  // Now it's like in classic BatchedCastKernel
+  auto *out = static_cast<OType *>(sample.output);
+  const auto *in = static_cast<const IType *>(sample.input);
+  for (int x = threadIdx.x + block_start; x < block_end; x += blockDim.x) {
+    out[x] = ConvertSat<OType>(in[x]);
+  }
+}
+
 }  // namespace kernels
 }  // namespace dali
 
