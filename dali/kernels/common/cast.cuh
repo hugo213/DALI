@@ -47,10 +47,17 @@ __global__ void BinSearchCastKernel(const CastSampleDesc *samples,
                                     const CastSampleBlockDesc *params,
                                     int nsamples, int block_volume_scale) {
   int i = 0;
-  for (int jump = nsamples / 2; jump; jump /= 2) {
-    if (i + jump < nsamples && params[i + jump].first_block <= blockIdx.x)
-      i += jump;
-  }
+  unsigned vote;
+  int t = threadIdx.x % 32;
+  #pragma unroll 8
+  do {
+    /* Thread (of index t in the warp) sets t-th bit of vote to true if params[i + t] is a block
+     * that has first_block <= blockIdx.x */
+    vote = __ballot_sync(0xffffffff, i + t < nsamples && params[i + t].first_block <= blockIdx.x);
+    i += 32 - __clz(vote);
+  } while (vote == 0xffffffff);
+  i--;
+
   CastSampleDesc sample = samples[i];
   int size = params[i].sample_size;
   int block_offset = blockIdx.x - params[i].first_block;
