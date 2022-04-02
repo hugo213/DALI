@@ -29,7 +29,7 @@ namespace dali {
 
 class CastGPU : public Cast<GPUBackend> {
  public:
-  explicit CastGPU(const OpSpec &spec) : Cast<GPUBackend>{spec}, block_setup_{kBlockVolumeScale} {}
+  explicit CastGPU(const OpSpec &spec) : Cast<GPUBackend>{spec}, block_setup_{block_volume_scale} {}
 
   bool SetupImpl(std::vector<OutputDesc> &output_desc, const DeviceWorkspace &ws) override;
   void RunImpl(DeviceWorkspace &ws) override;
@@ -39,7 +39,7 @@ class CastGPU : public Cast<GPUBackend> {
  protected:
   void PrepareBlocks(const DeviceWorkspace &ws);
 
-  static const int kBlockVolumeScale = 4;
+  static const int block_volume_scale = 4;
 
  private:
   using GpuBlockSetup = kernels::BlockSetup<1, -1>;
@@ -90,11 +90,11 @@ void CastGPU::RunImpl(DeviceWorkspace &ws) {
       params_host[sample_id].first_block = block_id;
     }
   }
- 
+
   kernels::CastSampleBlockDesc *params_dev;
   kernels::CastSampleDesc *samples_dev;
   std::tie(params_dev, samples_dev) = scratchpad.ToContiguousGPU(ws.stream(),
-    params_host, samples_);
+                                                                 params_host, samples_);
 
   DALIDataType itype = input.type();
   dim3 grid_dim = block_setup_.GridDim();
@@ -103,7 +103,7 @@ void CastGPU::RunImpl(DeviceWorkspace &ws) {
     TYPE_SWITCH(itype, type2id, IType, CAST_ALLOWED_TYPES, (
       kernels::BinSearchCastKernel<OType, IType>
           <<<grid_dim, block_dim, 0, ws.stream()>>>(samples_dev, params_dev,
-            num_samples, kBlockVolumeScale);
+            num_samples, block_volume_scale);
     ), DALI_FAIL(make_string("Invalid input type: ", itype)););  // NOLINT(whitespace/parens)
   ), DALI_FAIL(make_string("Invalid output type: ", output_type_)););  // NOLINT(whitespace/parens)
 }
