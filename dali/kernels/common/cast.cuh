@@ -31,6 +31,13 @@ struct CastSampleBlockDesc {
   unsigned sample_size;
 };
 
+const int DirectCastKernelMaxSamples = 8;
+struct DirectCastKernelParamPack {
+  CastSampleDesc samples[DirectCastKernelMaxSamples];
+  CastSampleBlockDesc blocks[DirectCastKernelMaxSamples];
+};
+
+
 template <typename OType, typename IType>
 __device__ __forceinline__ void CastKernelInternal(const CastSampleDesc& sample,
                                                    unsigned block_start, unsigned block_end) {
@@ -64,6 +71,29 @@ __global__ void BinSearchCastKernel(const CastSampleDesc *samples,
   auto block_size = block_volume_scale * blockDim.x;
   auto block_start = block_offset * block_size;
   auto block_end = block_start + block_size <= size ? block_start + block_size : size;
+
+  CastKernelInternal<OType, IType>(sample, block_start, block_end);
+}
+
+template <typename OType, typename IType>
+__global__ void DirectCastKernel(DirectCastKernelParamPack param_pack, int nsamples,
+                                 int block_volume_scale) {
+  const auto& samples = param_pack.samples;
+  const auto& blocks = param_pack.blocks;
+
+  int i;
+  #pragma unroll
+  for (i = DirectCastKernelMaxSamples; i >= 0; i--) {
+    if (i < nsamples && blocks[i].first_block <= blockIdx.x) break;
+  }
+
+  CastSampleDesc sample = samples[i];
+  int size = blocks[i].sample_size;
+  int block_offset = blockIdx.x - blocks[i].first_block;
+
+  int block_size = block_volume_scale * blockDim.x;
+  int block_start = block_offset * block_size;
+  int block_end = block_start + block_size <= size ? block_start + block_size : size;
 
   CastKernelInternal<OType, IType>(sample, block_start, block_end);
 }
