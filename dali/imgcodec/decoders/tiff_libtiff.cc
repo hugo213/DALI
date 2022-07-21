@@ -104,33 +104,38 @@ DecodeResult LibTiffDecoderInstance::Decode(SampleView<CPUBackend> out,
                                            DecodeParams opts) {
   TIFF *tiff = openTiff(in);
   DALI_ENFORCE(tiff != nullptr, make_string("Unable to open TIFF image: ", in->SourceInfo()));
-  // TODO(skarpinski) Port CanDecode here
 
-  using InType = uint8_t; // TODO(skarpinski)
-  using OutType = uint8_t;
-
-  // TODO(skarpinski) ROI
   uint32_t image_width, image_height;
-  uint16_t in_channels;
+  uint16_t in_channels, bit_depth;
+  bool is_tiled = TIFFIsTiled(tiff);
   LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &image_width));
   LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &image_height));
-  LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_SAMPLESPERPIXEL, &in_channels));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_SAMPLESPERPIXEL, &in_channels));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_BITSPERSAMPLE, &bit_depth));
 
-  // TODO(skarpinski) other formats
+  // TODO(skarpinski) support other color formats
   DALI_ENFORCE(opts.format == DALI_RGB, "Only RGB output is supported");
-  DALI_ENFORCE(in_channels == 3, "Only 3-channel RGB input is supported");
+  DALI_ENFORCE(in_channels == 3, "Only 3-channel input is supported");
   unsigned out_channels = 3;
 
-  uint64_t out_row_stride = image_width * out_channels;
+  // TODO(skarpinski) support different types
+  using InType = uint8_t;
+  using OutType = uint8_t;
+  DALI_ENFORCE(bit_depth == 8);
 
+  // TODO(skarpinski) support tiled tiffs
+  DALI_ENFORCE(!is_tiled);
+
+  uint64_t out_row_stride = image_width * out_channels;
   auto row_nbytes = TIFFScanlineSize(tiff);
   std::unique_ptr<InType, void(*)(void*)> row_buf{
     static_cast<InType *>(_TIFFmalloc(row_nbytes)), _TIFFfree};
   DALI_ENFORCE(row_buf.get() != nullptr, "Could not allocate memory");
-  // memset(row_buf.get(), 0, row_nbytes);  // TODO(skarpinski) Is it safe to remove?
 
   InType * const row_in  = row_buf.get();
   OutType * const img_out = out.mutable_data<OutType>();
+
+  // TODO(skarpinski) support ROI
 
   for (uint64_t y = 0; y < image_height; y++) {
     LIBTIFF_CALL(TIFFReadScanline(tiff, row_in, y, 0));
