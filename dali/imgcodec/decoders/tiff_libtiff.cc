@@ -104,29 +104,30 @@ DecodeResult LibTiffDecoderInstance::Decode(SampleView<CPUBackend> out,
                                            DecodeParams opts) {
   TIFF *tiff = openTiff(in);
   DALI_ENFORCE(tiff != nullptr, make_string("Unable to open TIFF image: ", in->SourceInfo()));
-  // TODO(skarpinski) Check if open was successful
   // TODO(skarpinski) Port CanDecode here
 
-  using InType = uint8_t;
+  using InType = uint8_t; // TODO(skarpinski)
   using OutType = uint8_t;
-
-  // TODO(skarpinski) other formats
-  DALI_ENFORCE(opts.format == DALI_RGB, "Only RGB supported for now");
-  unsigned out_channels = 3;
-
-  unsigned in_channels = 3;  // TODO(skarpinski) Read this from TIFF
 
   // TODO(skarpinski) ROI
   uint32_t image_width, image_height;
+  uint16_t in_channels;
   LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &image_width));
   LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &image_height));
+  LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_SAMPLESPERPIXEL, &in_channels));
+
+  // TODO(skarpinski) other formats
+  DALI_ENFORCE(opts.format == DALI_RGB, "Only RGB output is supported");
+  DALI_ENFORCE(in_channels == 3, "Only 3-channel RGB input is supported");
+  unsigned out_channels = 3;
+
   uint64_t out_row_stride = image_width * out_channels;
 
   auto row_nbytes = TIFFScanlineSize(tiff);
   std::unique_ptr<InType, void(*)(void*)> row_buf{
     static_cast<InType *>(_TIFFmalloc(row_nbytes)), _TIFFfree};
   DALI_ENFORCE(row_buf.get() != nullptr, "Could not allocate memory");
-  memset(row_buf.get(), 0, row_nbytes);  // TODO(skarpinski) Do we need to zero it out?
+  // memset(row_buf.get(), 0, row_nbytes);  // TODO(skarpinski) Is it safe to remove?
 
   InType * const row_in  = row_buf.get();
   OutType * const img_out = out.mutable_data<OutType>();
