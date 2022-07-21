@@ -15,6 +15,7 @@
 #include <tiffio.h>
 #include "dali/imgcodec/decoders/tiff_libtiff.h"
 #include "dali/imgcodec/util/convert.h"
+#include "dali/core/tensor_shape_print.h"
 
 #define LIBTIFF_CALL_SUCCESS 1
 #define LIBTIFF_CALL(call)                                \
@@ -105,13 +106,18 @@ DecodeResult LibTiffDecoderInstance::Decode(SampleView<CPUBackend> out,
   TIFF *tiff = openTiff(in);
   DALI_ENFORCE(tiff != nullptr, make_string("Unable to open TIFF image: ", in->SourceInfo()));
 
-  uint32_t image_width, image_height;
-  uint16_t in_channels, bit_depth;
+  uint32_t image_width, image_height, rows_per_strip;
+  uint16_t in_channels, bit_depth, orientation, compression;
   bool is_tiled = TIFFIsTiled(tiff);
   LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &image_width));
   LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &image_height));
   LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_SAMPLESPERPIXEL, &in_channels));
   LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_BITSPERSAMPLE, &bit_depth));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_ORIENTATION, &orientation));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_COMPRESSION, &compression));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_ROWSPERSTRIP, &rows_per_strip));
+
+  std::cerr << "roi is " << opts.roi.begin << " to " << opts.roi.end << std::endl;
 
   // TODO(skarpinski) support other color formats
   DALI_ENFORCE(opts.format == DALI_RGB, "Only RGB output is supported");
@@ -131,17 +137,35 @@ DecodeResult LibTiffDecoderInstance::Decode(SampleView<CPUBackend> out,
   std::unique_ptr<InType, void(*)(void*)> row_buf{
     static_cast<InType *>(_TIFFmalloc(row_nbytes)), _TIFFfree};
   DALI_ENFORCE(row_buf.get() != nullptr, "Could not allocate memory");
-
   InType * const row_in  = row_buf.get();
   OutType * const img_out = out.mutable_data<OutType>();
 
-  // TODO(skarpinski) support ROI
+  // Need to read sequentially since not all the images support random access
+  // From: http://www.libtiff.org/man/TIFFReadScanline.3t.html
+  // Compression algorithm does not support random access. Data was requested in a non-sequential
+  // order from a file that uses a compression algorithm and that has RowsPerStrip greater than one.
+  // That is, data in the image is stored in a compressed form, and with multiple rows packed into a
+  // strip. In this case, the library does not support random access to the data. The data should
+  // either be accessed sequentially, or the file should be converted so that each strip is made up
+  // of one row of data.
+  const bool allow_random_row_access = (compression == COMPRESSION_NONE || rows_per_strip == 1);
+  if (!allow_random_row_access) {
+    for (int64_t y = 0; y < opts.roi.begin[0]; y++) {
+      LIBTIFF_CALL(TIFFReadScanline(tiff, row_in, opts.roi.begin[0] + y, 0));
+    }
+  }
 
-  for (uint64_t y = 0; y < image_height; y++) {
+  if (!opts.use_roi) {
+    opts.roi.begin = {0, 0, 0};
+    opts.roi.end = out.shape();
+  }
+
+  for (uint64_t y = 0; y < opts.roi.end[0]; y++) {
     LIBTIFF_CALL(TIFFReadScanline(tiff, row_in, y, 0));
 
     // TODO(skarpinski) Color space conversion
-    memcpy(img_out + (y * out_row_stride), row_in, out_row_stride);
+    memcpy(img_out + (y * out_row_stride), row_in + opts.roi.begin[1] * in_channels,
+           opts.roi.shape()[1] * in_channels);
   }
 
   return {true, nullptr};
