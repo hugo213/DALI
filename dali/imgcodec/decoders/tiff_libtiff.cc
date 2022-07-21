@@ -103,21 +103,19 @@ TIFF *openTiff(ImageSource *in) {
 DecodeResult LibTiffDecoderInstance::Decode(SampleView<CPUBackend> out,
                                            ImageSource *in,
                                            DecodeParams opts) {
-  TIFF *tiff = openTiff(in);
+  std::unique_ptr<TIFF, void (*)(TIFF *)> tiff = {openTiff(in), &TIFFClose};
   DALI_ENFORCE(tiff != nullptr, make_string("Unable to open TIFF image: ", in->SourceInfo()));
 
   uint32_t image_width, image_height, rows_per_strip;
   uint16_t in_channels, bit_depth, orientation, compression;
-  bool is_tiled = TIFFIsTiled(tiff);
-  LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &image_width));
-  LIBTIFF_CALL(TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &image_height));
-  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_SAMPLESPERPIXEL, &in_channels));
-  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_BITSPERSAMPLE, &bit_depth));
-  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_ORIENTATION, &orientation));
-  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_COMPRESSION, &compression));
-  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff, TIFFTAG_ROWSPERSTRIP, &rows_per_strip));
-
-  std::cerr << "roi is " << opts.roi.begin << " to " << opts.roi.end << std::endl;
+  bool is_tiled = TIFFIsTiled(tiff.get());
+  LIBTIFF_CALL(TIFFGetField(tiff.get(), TIFFTAG_IMAGEWIDTH, &image_width));
+  LIBTIFF_CALL(TIFFGetField(tiff.get(), TIFFTAG_IMAGELENGTH, &image_height));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff.get(), TIFFTAG_SAMPLESPERPIXEL, &in_channels));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff.get(), TIFFTAG_BITSPERSAMPLE, &bit_depth));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff.get(), TIFFTAG_ORIENTATION, &orientation));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff.get(), TIFFTAG_COMPRESSION, &compression));
+  LIBTIFF_CALL(TIFFGetFieldDefaulted(tiff.get(), TIFFTAG_ROWSPERSTRIP, &rows_per_strip));
 
   // TODO(skarpinski) support other color formats
   DALI_ENFORCE(opts.format == DALI_RGB, "Only RGB output is supported");
@@ -132,13 +130,17 @@ DecodeResult LibTiffDecoderInstance::Decode(SampleView<CPUBackend> out,
   // TODO(skarpinski) support tiled tiffs
   DALI_ENFORCE(!is_tiled);
 
-  uint64_t out_row_stride = image_width * out_channels;
-  auto row_nbytes = TIFFScanlineSize(tiff);
+  auto row_nbytes = TIFFScanlineSize(tiff.get());
   std::unique_ptr<InType, void(*)(void*)> row_buf{
     static_cast<InType *>(_TIFFmalloc(row_nbytes)), _TIFFfree};
   DALI_ENFORCE(row_buf.get() != nullptr, "Could not allocate memory");
   InType * const row_in  = row_buf.get();
   OutType * const img_out = out.mutable_data<OutType>();
+
+  if (!opts.use_roi) {
+    opts.roi.begin = {0, 0, 0};
+    opts.roi.end = out.shape();
+  }
 
   // Need to read sequentially since not all the images support random access
   // From: http://www.libtiff.org/man/TIFFReadScanline.3t.html
@@ -151,20 +153,17 @@ DecodeResult LibTiffDecoderInstance::Decode(SampleView<CPUBackend> out,
   const bool allow_random_row_access = (compression == COMPRESSION_NONE || rows_per_strip == 1);
   if (!allow_random_row_access) {
     for (int64_t y = 0; y < opts.roi.begin[0]; y++) {
-      LIBTIFF_CALL(TIFFReadScanline(tiff, row_in, opts.roi.begin[0] + y, 0));
+      LIBTIFF_CALL(TIFFReadScanline(tiff.get(), row_in, y, 0));
     }
   }
 
-  if (!opts.use_roi) {
-    opts.roi.begin = {0, 0, 0};
-    opts.roi.end = out.shape();
-  }
+  uint64_t out_row_stride = opts.roi.shape()[1] * out_channels;
 
-  for (uint64_t y = 0; y < opts.roi.end[0]; y++) {
-    LIBTIFF_CALL(TIFFReadScanline(tiff, row_in, y, 0));
+  for (int64_t roi_y = 0; roi_y < opts.roi.shape()[0]; roi_y++) {
+    LIBTIFF_CALL(TIFFReadScanline(tiff.get(), row_in, opts.roi.begin[0] + roi_y, 0));
 
     // TODO(skarpinski) Color space conversion
-    memcpy(img_out + (y * out_row_stride), row_in + opts.roi.begin[1] * in_channels,
+    _TIFFmemcpy(img_out + (roi_y * out_row_stride), row_in + opts.roi.begin[1] * in_channels,
            opts.roi.shape()[1] * in_channels);
   }
 
