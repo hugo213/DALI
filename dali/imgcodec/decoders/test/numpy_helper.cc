@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-// Stolen from numpy_loader
+// Stolen from numpy_loader.cc
 
 #include "dali/imgcodec/decoders/test/numpy_helper.h"
 #include "dali/pipeline/data/tensor.h"

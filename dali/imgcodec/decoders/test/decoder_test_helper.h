@@ -15,7 +15,6 @@
 #ifndef DALI_IMGCODEC_DECODERS_DECODER_TEST_H_
 #define DALI_IMGCODEC_DECODERS_DECODER_TEST_H_
 
-#include "dali/imgcodec/decoders/test/decoder_test.h"
 #include "dali/pipeline/data/tensor.h"
 #include "dali/operators/reader/loader/numpy_loader.h"
 #include "dali/kernels/transpose/transpose.h"
@@ -32,9 +31,9 @@ namespace imgcodec {
 namespace test {
 
 template<typename OutputType>
-class CpuDecoderTest : public ::testing::Test {
+class CpuDecoderTestBase : public ::testing::Test {
  public:
-  CpuDecoderTest() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
+  CpuDecoderTestBase() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
 
   Tensor<CPUBackend> Decode(ImageSource *src, const DecodeParams &opts = {}) {
     Init();
@@ -50,6 +49,7 @@ class CpuDecoderTest : public ::testing::Test {
     SampleView<CPUBackend> view(result.raw_mutable_data(), result.shape(), result.type());
     DecodeResult decode_result = decoder_->Decode(view, src, opts);
     EXPECT_TRUE(decode_result.success);
+    
     return result;
   }
 
@@ -108,7 +108,7 @@ class CpuDecoderTest : public ::testing::Test {
 
 
 template<typename OutputType>
-class NumpyDecoderTest : public CpuDecoderTest<OutputType> {
+class NumpyDecoderTestBase : public CpuDecoderTestBase<OutputType> {
  private:
   template<typename InputType>
   Tensor<CPUBackend> Convert(const Tensor<CPUBackend> &in) {
