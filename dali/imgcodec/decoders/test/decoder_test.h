@@ -15,20 +15,46 @@
 #ifndef DALI_IMGCODEC_DECODERS_DECODER_TEST_H_
 #define DALI_IMGCODEC_DECODERS_DECODER_TEST_H_
 
+#include "dali/imgcodec/decoders/test/decoder_test.h"
+#include "dali/pipeline/data/tensor.h"
+#include "dali/operators/reader/loader/numpy_loader.h"
+#include "dali/kernels/transpose/transpose.h"
+#include "dali/core/static_switch.h"
+#include "dali/pipeline/data/views.h"
+#include "dali/imgcodec/decoders/test/numpy_helper.h"
+
+#include "dali/imgcodec/image_format.h"
 #include "dali/imgcodec/image_decoder.h"
 #include "dali/test/dali_test.h"
-#include "dali/pipeline/util/thread_pool.h"
-#include "dali/imgcodec/decoders/test/numpy_helper.h"
 
 namespace dali {
 namespace imgcodec {
 namespace test {
 
+template<typename OutputType>
 class CpuDecoderTest : public ::testing::Test {
  public:
-  CpuDecoderTest();
+  CpuDecoderTest() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
 
-  Tensor<CPUBackend> Decode(ImageSource *src);
+  Tensor<CPUBackend> Decode(ImageSource *src) {
+    if (!parser_) parser_ = GetParser();
+    if (!decoder_) decoder_ = CreateDecoder(tp_);
+
+    Tensor<CPUBackend> result;
+
+    EXPECT_TRUE(parser_->CanParse(src));
+    ImageInfo info = parser_->GetInfo(src);
+
+    EXPECT_TRUE(decoder_->CanDecode(src, {}));
+    result.Resize(info.shape, type2id<OutputType>::value);
+
+    SampleView<CPUBackend> view(result.raw_mutable_data(), result.shape(), result.type());
+    DecodeResult decode_result = decoder_->Decode(view, src, {});
+
+    EXPECT_TRUE(decode_result.success);
+
+    return result;
+  }
 
   virtual Tensor<CPUBackend> DecodeReference(const std::string &reference_path) = 0;
 
@@ -42,9 +68,12 @@ class CpuDecoderTest : public ::testing::Test {
   ThreadPool tp_;
 };
 
-class NumpyDecoderTest : public CpuDecoderTest {
+template<typename OutputType>
+class NumpyDecoderTest : public CpuDecoderTest<OutputType> {
  public:
-  Tensor<CPUBackend> DecodeReference(const std::string &reference_path) override;
+  Tensor<CPUBackend> DecodeReference(const std::string &reference_path) override {
+    return ReadNumpy(reference_path);
+  }
 };
 
 }  // namespace test
