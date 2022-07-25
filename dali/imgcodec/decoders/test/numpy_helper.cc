@@ -1,13 +1,34 @@
-#include "dali/imgcodec/decoders/decoder_test.h"
+// Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+
+// Stolen from numpy_loader
+
+#include "dali/imgcodec/decoders/test/numpy_helper.h"
 #include "dali/pipeline/data/tensor.h"
 #include "dali/operators/reader/loader/numpy_loader.h"
+#include "dali/kernels/transpose/transpose.h"
+#include "dali/core/static_switch.h"
+#include "dali/pipeline/data/views.h"
+
+#define NUMPY_ALLOWED_TYPES \
+  (bool, uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, float, float16, \
+  double)
 
 namespace dali {
 namespace imgcodec {
 namespace test {
-
-// Stolen from numpy_loader
-namespace numpy {
 
 const TypeInfo &TypeFromNumpyStr(const std::string &format) {
   if (format == "u1") return TypeTable::GetTypeInfo<uint8_t>();
@@ -179,29 +200,38 @@ void ParseHeader(FileStream *file, NumpyHeaderMeta& parsed_header) {
   parsed_header.data_offset = offset;
 }
 
-}  // numpy
+static void TransposeHelper(SampleView<CPUBackend> output, ConstSampleView<CPUBackend> input) {
+  int n_dims = input.shape().sample_dim();
+  SmallVector<int, 6> perm;
+  perm.resize(n_dims);
+  for (int i = 0; i < n_dims; ++i)
+    perm[i] = n_dims - i - 1;
+  TYPE_SWITCH(input.type(), type2id, T, NUMPY_ALLOWED_TYPES, (
+    kernels::TransposeGrouped(view<T>(output), view<const T>(input), make_cspan(perm));
+  ), DALI_FAIL(make_string("Unsupported input type: ", input.type())));  // NOLINT
+}
 
-
-
-
-Tensor<CPUBackend> CpuDecoderTest::ReadNumpy(const std::string &path) {
-  std::cerr << "Hello there" << std::endl;
-
+Tensor<CPUBackend> ReadNumpy(const std::string &path) {
   auto file = FileStream::Open(path, false, false);
   NumpyHeaderMeta meta;
-  numpy::ParseHeader(file.get(), meta);
+  ParseHeader(file.get(), meta);
   file->SeekRead(meta.data_offset, SEEK_SET);
 
   Tensor<CPUBackend> data;
   data.Resize(meta.shape, meta.type());
   Index ret = file->Read(static_cast<uint8_t*>(data.raw_mutable_data()), meta.nbytes());
   DALI_ENFORCE(ret == (Index)meta.nbytes(), make_string("Failed to read file: ", path));
-  DALI_ENFORCE(meta.fortran_order, make_string("Numpy file in unsupported Fortran order:", path));
-  return data;
-}
 
-TEST_F(CpuDecoderTest, TestXd) {
-    ReadNumpy("/home/skarpinski/dummy-numpy");
+  if (meta.fortran_order) {
+    Tensor<CPUBackend> transposed;
+    transposed.Resize(data.shape(), data.type());
+    SampleView<CPUBackend> input(data.raw_mutable_data(), data.shape(), data.type());
+    SampleView<CPUBackend> output(transposed.raw_mutable_data(), transposed.shape(),
+                                  transposed.type());
+    TransposeHelper(output, input);
+    return transposed;
+  }
+  return data;
 }
 
 }  // namespace test

@@ -12,34 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef DALI_IMGCODEC_DECODERS_DECODER_IMPL_H_
-#define DALI_IMGCODEC_DECODERS_DECODER_IMPL_H_
+#ifndef DALI_IMGCODEC_DECODERS_TEST_NUMPY_HELPER_H_
+#define DALI_IMGCODEC_DECODERS_TEST_NUMPY_HELPER_H_
 
-#include "dali/imgcodec/image_decoder.h"
-#include "dali/test/dali_test.h"
-#include "dali/pipeline/util/thread_pool.h"
+#include "dali/pipeline/data/tensor.h"
 
 namespace dali {
 namespace imgcodec {
 namespace test {
 
-class CpuDecoderTest : public ::testing::Test {
- public:
-
-  CpuDecoderTest() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
-
-  // template<typename OutputType>
-  // void Run(const std::string &image, const std::string &reference);
-
-  Tensor<CPUBackend> ReadNumpy(const std::string &path);
-
- private:
-  ThreadPool tp_;
-  std::shared_ptr<ImageDecoderInstance> decoder_instance_;
-};
+Tensor<CPUBackend> ReadNumpy(const std::string &path);
 
 }  // namespace test
 }  // namespace imgcodec
 }  // namespace dali
 
-#endif  // DALI_IMGCODEC_DECODERS_DECODER_IMPL_H_
+#endif  // DALI_IMGCODEC_DECODERS_TEST_NUMPY_HELPER_H_
