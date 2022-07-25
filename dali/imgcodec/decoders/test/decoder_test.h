@@ -51,11 +51,12 @@ class CpuDecoderTest : public ::testing::Test {
     return result;
   }
 
-  void AssertEqual(const Tensor<CPUBackend> &a, const Tensor<CPUBackend> &b) {
-    EXPECT_EQ(a.shape(), b.shape()) << "Different shapes";
-    auto va = view<const OutputType>(a), vb = view<const OutputType>(b);
-    for (int i = 0; i < volume(a.shape()); i++) {
-      EXPECT_EQ(va.data[i], vb.data[i]);  // TODO(skarpinski) Pretty-print position on error
+  void AssertEqual(const Tensor<CPUBackend> &img, const Tensor<CPUBackend> &ref) {
+    EXPECT_EQ(img.shape(), ref.shape()) << "Different shapes";
+    auto img_view = view<const OutputType>(img), ref_view = view<const OutputType>(ref);
+    for (int i = 0; i < volume(img.shape()); i++) {
+      // TODO(skarpinski) Pretty-print position on error
+      EXPECT_EQ(img_view.data[i], ref_view.data[i]);
     }
   }
 
@@ -74,9 +75,25 @@ class CpuDecoderTest : public ::testing::Test {
 
 template<typename OutputType>
 class NumpyDecoderTest : public CpuDecoderTest<OutputType> {
+ private:
+  template<typename InputType>
+  Tensor<CPUBackend> Convert(const Tensor<CPUBackend> &in) {
+    Tensor<CPUBackend> out;
+    out.Resize(in.shape(), type2id<OutputType>::value);
+    auto in_view = view<const InputType>(in), out_view = view<OutputType>(out);
+    for (int i = 0; i < volume(in.shape()); i++) {
+      out_view.data[i] = ConvertSatNorm<OutputType>(in_view.data[i]);
+    }
+    return out;
+  }
  public:
   Tensor<CPUBackend> ReadReference(const std::string &reference_path) override {
-    return ReadNumpy(reference_path);
+    Tensor<CPUBackend> ref = ReadNumpy(reference_path);
+
+    DALIDataType output_type = type2id<OutputType>::value;
+    TYPE_SWITCH(ref.type(), type2id, InputType, NUMPY_ALLOWED_TYPES, (
+      return Convert<InputType>(ref);
+    ), DALI_FAIL(make_string("Unsupported numpy reference type: ", ref.type())));  // NOLINT
   }
 };
 

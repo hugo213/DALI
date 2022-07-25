@@ -17,6 +17,10 @@
 
 #include "dali/pipeline/data/tensor.h"
 
+#define NUMPY_ALLOWED_TYPES \
+  (bool, uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t, int32_t, int64_t, float, float16, \
+  double)
+
 namespace dali {
 namespace imgcodec {
 namespace test {
