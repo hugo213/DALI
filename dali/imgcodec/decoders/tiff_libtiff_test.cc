@@ -23,7 +23,7 @@
 #include "dali/core/tensor_shape_print.h"
 #include "dali/core/mm/memory.h"
 #include "dali/core/convert.h"
-#include "dali/imgcodec/decoders/test/decoder_test.h"
+#include "dali/imgcodec/decoders/test/decoder_test_helper.h"
 
 namespace dali {
 namespace imgcodec {
@@ -31,13 +31,11 @@ namespace test {
 
 namespace {
 const auto &dali_extra = dali::testing::dali_extra_path();
-
 auto img_color     = dali_extra + "/db/single/tiff/0/cat-111793_640.tiff";
 auto img_color_ref = dali_extra + "/db/single/reference/tiff/0/cat-111793_640.tiff.npy";
-
 }  // namespace
 
-class LibTiffDecoderTest : public NumpyDecoderTest<uint8_t> {
+class LibTiffDecoderTest : public NumpyDecoderTestBase<uint8_t> {
  protected:
   std::shared_ptr<ImageDecoderInstance> CreateDecoder(ThreadPool &tp) override {
     LibTiffDecoder decoder;
@@ -48,14 +46,26 @@ class LibTiffDecoderTest : public NumpyDecoderTest<uint8_t> {
   }
 };
 
-TEST_F(LibTiffDecoderTest, TestXd) {
-  auto ref = DecodeReference(img_color_ref);
+TEST_F(LibTiffDecoderTest, Test) {
+  auto ref = ReadReference(img_color_ref);
   auto src = ImageSource::FromFilename(img_color);
   auto img = Decode(&src);
-  std::cerr << ref.shape() << " " << img.shape() << std::endl;
-  auto vr = view<uint8_t>(ref);
-  auto vi = view<uint8_t>(img);
-  std::cerr << (int)*vr(0,0,0) << (int)*vi(0,0,0) << std::endl;
+  AssertEqual(img, ref);
+}
+
+TEST_F(LibTiffDecoderTest, TestROI) {
+  auto ref = ReadReference(img_color_ref);
+  auto src = ImageSource::FromFilename(img_color);
+  auto info = GetInfo(&src);
+
+  DecodeParams params;
+  params.use_roi = true;
+  params.roi.begin = {13, 17, 0};
+  params.roi.end = {info.shape[0] - 55, info.shape[1] - 10, 3};
+
+  auto img = Decode(&src, params);
+
+  AssertEqual(img, Crop(ref, params.roi.begin, params.roi.shape()));
 }
 
 }  // namespace test
