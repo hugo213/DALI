@@ -42,7 +42,6 @@ class CpuDecoderTest : public ::testing::Test {
     EXPECT_TRUE(parser_->CanParse(src));
     ImageInfo info = parser_->GetInfo(src);
 
-
     Tensor<CPUBackend> result;
     EXPECT_TRUE(decoder_->CanDecode(src, {}));
     result.Resize(info.shape, type2id<OutputType>::value);
@@ -55,13 +54,12 @@ class CpuDecoderTest : public ::testing::Test {
   void AssertEqual(const Tensor<CPUBackend> &a, const Tensor<CPUBackend> &b) {
     EXPECT_EQ(a.shape(), b.shape()) << "Different shapes";
     auto va = view<const OutputType>(a), vb = view<const OutputType>(b);
-
     for (int i = 0; i < volume(a.shape()); i++) {
       EXPECT_EQ(va.data[i], vb.data[i]);  // TODO(skarpinski) Pretty-print position on error
     }
   }
 
-  virtual Tensor<CPUBackend> DecodeReference(const std::string &reference_path) = 0;
+  virtual Tensor<CPUBackend> ReadReference(const std::string &reference_path) = 0;
 
  protected:
   virtual std::shared_ptr<ImageDecoderInstance> CreateDecoder(ThreadPool &tp) = 0;
@@ -73,10 +71,11 @@ class CpuDecoderTest : public ::testing::Test {
   ThreadPool tp_;
 };
 
+
 template<typename OutputType>
 class NumpyDecoderTest : public CpuDecoderTest<OutputType> {
  public:
-  Tensor<CPUBackend> DecodeReference(const std::string &reference_path) override {
+  Tensor<CPUBackend> ReadReference(const std::string &reference_path) override {
     return ReadNumpy(reference_path);
   }
 };
