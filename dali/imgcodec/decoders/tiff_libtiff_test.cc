@@ -37,7 +37,7 @@ auto img_color_ref = dali_extra + "/db/single/reference/tiff/0/cat-111793_640.ti
 
 }  // namespace
 
-class LibTiffDecoderTest : public NumpyDecoderTest {
+class LibTiffDecoderTest : public NumpyDecoderTest<uint8_t> {
  protected:
   std::shared_ptr<ImageDecoderInstance> CreateDecoder(ThreadPool &tp) override {
     LibTiffDecoder decoder;
@@ -53,6 +53,9 @@ TEST_F(LibTiffDecoderTest, TestXd) {
   auto src = ImageSource::FromFilename(img_color);
   auto img = Decode(&src);
   std::cerr << ref.shape() << " " << img.shape() << std::endl;
+  auto vr = view<uint8_t>(ref);
+  auto vi = view<uint8_t>(img);
+  std::cerr << (int)*vr(0,0,0) << (int)*vi(0,0,0) << std::endl;
 }
 
 }  // namespace test
