@@ -6,14 +6,27 @@
 #include "dali/pipeline/data/views.h"
 #include "dali/imgcodec/decoders/test/numpy_helper.h"
 
+#include "dali/imgcodec/image_format.h"
+#include "dali/imgcodec/image_decoder.h"
+
 namespace dali {
 namespace imgcodec {
 namespace test {
 
 CpuDecoderTest::CpuDecoderTest() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
 
-void CpuDecoderTest::Compare(const std::string &image_path, const std::string &reference_path) {
-  std::cerr << "CpuDecoderTest::Compare is a no-op for now!";
+Tensor<CPUBackend> CpuDecoderTest::Decode(ImageSource *src) {
+  if (!parser_) parser_ = GetParser();
+  if (!decoder_) decoder_ = CreateDecoder(tp_);
+
+  EXPECT_TRUE(parser_->CanParse(src));
+  ImageInfo info = parser_->GetInfo(src);
+
+  Tensor<CPUBackend> result;
+
+  EXPECT_TRUE(decoder_->CanDecode(src, {}));
+
+  return result;
 }
 
 Tensor<CPUBackend> NumpyDecoderTest::DecodeReference(const std::string &reference_path) {
