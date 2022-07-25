@@ -56,6 +56,15 @@ class CpuDecoderTest : public ::testing::Test {
     return result;
   }
 
+  void AssertEqual(const Tensor<CPUBackend> &a, const Tensor<CPUBackend> &b) {
+    EXPECT_EQ(a.shape(), b.shape()) << "Different shapes";
+    auto va = view<const OutputType>(a), vb = view<const OutputType>(b);
+
+    for (int i = 0; i < volume(a.shape()); i++) {
+      EXPECT_EQ(va.data[i], vb.data[i]);
+    }
+  }
+
   virtual Tensor<CPUBackend> DecodeReference(const std::string &reference_path) = 0;
 
  protected:
