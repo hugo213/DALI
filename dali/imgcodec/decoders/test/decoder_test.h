@@ -22,7 +22,6 @@
 #include "dali/core/static_switch.h"
 #include "dali/pipeline/data/views.h"
 #include "dali/imgcodec/decoders/test/numpy_helper.h"
-
 #include "dali/imgcodec/image_format.h"
 #include "dali/imgcodec/image_decoder.h"
 #include "dali/test/dali_test.h"
@@ -40,19 +39,16 @@ class CpuDecoderTest : public ::testing::Test {
     if (!parser_) parser_ = GetParser();
     if (!decoder_) decoder_ = CreateDecoder(tp_);
 
-    Tensor<CPUBackend> result;
-
     EXPECT_TRUE(parser_->CanParse(src));
     ImageInfo info = parser_->GetInfo(src);
 
+
+    Tensor<CPUBackend> result;
     EXPECT_TRUE(decoder_->CanDecode(src, {}));
     result.Resize(info.shape, type2id<OutputType>::value);
-
     SampleView<CPUBackend> view(result.raw_mutable_data(), result.shape(), result.type());
     DecodeResult decode_result = decoder_->Decode(view, src, {});
-
     EXPECT_TRUE(decode_result.success);
-
     return result;
   }
 
@@ -61,7 +57,7 @@ class CpuDecoderTest : public ::testing::Test {
     auto va = view<const OutputType>(a), vb = view<const OutputType>(b);
 
     for (int i = 0; i < volume(a.shape()); i++) {
-      EXPECT_EQ(va.data[i], vb.data[i]);
+      EXPECT_EQ(va.data[i], vb.data[i]);  // TODO(skarpinski) Pretty-print position on error
     }
   }
 
