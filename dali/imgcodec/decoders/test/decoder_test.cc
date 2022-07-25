@@ -10,9 +10,14 @@ namespace dali {
 namespace imgcodec {
 namespace test {
 
-TEST_F(CpuDecoderTest, TestXd) {
-  auto t = ReadNumpy("/home/skarpinski/DALI_extra/db/single/reference/tiff/0/cat-111793_640.tiff.npy");
-  std::cerr << t.shape();
+CpuDecoderTest::CpuDecoderTest() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
+
+void CpuDecoderTest::Compare(const std::string &image_path, const std::string &reference_path) {
+  std::cerr << "CpuDecoderTest::Compare is a no-op for now!";
+}
+
+Tensor<CPUBackend> NumpyDecoderTest::DecodeReference(const std::string &reference_path) {
+  return ReadNumpy(reference_path);
 }
 
 }  // namespace test

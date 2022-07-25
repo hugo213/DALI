@@ -26,15 +26,25 @@ namespace test {
 
 class CpuDecoderTest : public ::testing::Test {
  public:
+  CpuDecoderTest();
 
-  CpuDecoderTest() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
+  void Compare(const std::string &image_path, const std::string &reference_path);
 
-  template<typename OutputType>
-  void Run(const std::string &image, const std::string &reference);
+  Tensor<CPUBackend> Decode(const std::string &image);
+
+  virtual Tensor<CPUBackend> DecodeReference(const std::string &reference_path) = 0;
+
+ protected:
+  virtual std::shared_ptr<ImageDecoderInstance> CreateDecoder(ThreadPool &tp) = 0;
 
  private:
   ThreadPool tp_;
   std::shared_ptr<ImageDecoderInstance> decoder_instance_;
+};
+
+class NumpyDecoderTest : public CpuDecoderTest {
+ public:
+  Tensor<CPUBackend> DecodeReference(const std::string &reference_path) override;
 };
 
 }  // namespace test
