@@ -25,6 +25,7 @@
 #include "dali/imgcodec/image_format.h"
 #include "dali/imgcodec/image_decoder.h"
 #include "dali/test/dali_test.h"
+#include "dali/kernels/slice/slice_cpu.h"
 
 namespace dali {
 namespace imgcodec {
@@ -35,18 +36,19 @@ class CpuDecoderTest : public ::testing::Test {
  public:
   CpuDecoderTest() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
 
-  Tensor<CPUBackend> Decode(ImageSource *src) {
-    if (!parser_) parser_ = GetParser();
-    if (!decoder_) decoder_ = CreateDecoder(tp_);
+  Tensor<CPUBackend> Decode(ImageSource *src, const DecodeParams &opts = {}) {
+    Init();
 
     EXPECT_TRUE(parser_->CanParse(src));
     ImageInfo info = parser_->GetInfo(src);
 
     Tensor<CPUBackend> result;
-    EXPECT_TRUE(decoder_->CanDecode(src, {}));
-    result.Resize(info.shape, type2id<OutputType>::value);
+    EXPECT_TRUE(decoder_->CanDecode(src, opts));
+    TensorShape<> shape = (opts.use_roi ? opts.roi.shape() : info.shape);
+    result.Resize(shape, type2id<OutputType>::value);
+
     SampleView<CPUBackend> view(result.raw_mutable_data(), result.shape(), result.type());
-    DecodeResult decode_result = decoder_->Decode(view, src, {});
+    DecodeResult decode_result = decoder_->Decode(view, src, opts);
     EXPECT_TRUE(decode_result.success);
     return result;
   }
@@ -56,8 +58,35 @@ class CpuDecoderTest : public ::testing::Test {
     auto img_view = view<const OutputType>(img), ref_view = view<const OutputType>(ref);
     for (int i = 0; i < volume(img.shape()); i++) {
       // TODO(skarpinski) Pretty-print position on error
-      EXPECT_EQ(img_view.data[i], ref_view.data[i]);
+      ASSERT_EQ(img_view.data[i], ref_view.data[i]) << "Pixel " << i;
     }
+  }
+
+  Tensor<CPUBackend> Crop(const Tensor<CPUBackend> &input,
+                          const TensorShape<> &roi_begin, const TensorShape<> &roi_shape) {
+    int ndim = input.shape().sample_dim();
+    Tensor<CPUBackend> output;
+    output.Resize(roi_shape, type2id<OutputType>::value);
+
+    VALUE_SWITCH(ndim, Dims, (2, 3, 4), (
+      auto out_view = view<OutputType, Dims>(output);
+      auto in_view = view<const OutputType, Dims>(input);
+      kernels::SliceCPU<OutputType, OutputType, Dims> kernel;
+      kernels::SliceArgs<OutputType, Dims> args;
+      args.anchor = roi_begin;
+      args.shape = roi_shape;
+      kernels::KernelContext ctx;
+      // no need to run Setup (we already know the output shape)
+      kernel.Schedule(ctx, out_view, in_view, args, tp_);
+      tp_.RunAll();
+    ), DALI_FAIL(make_string("Unsupported number of dimensions: ", ndim)););  // NOLINT
+
+    return output;
+  }
+
+  ImageInfo GetInfo(ImageSource *src) {
+    Init();
+    return parser_->GetInfo(src);
   }
 
   virtual Tensor<CPUBackend> ReadReference(const std::string &reference_path) = 0;
@@ -67,6 +96,11 @@ class CpuDecoderTest : public ::testing::Test {
   virtual std::shared_ptr<ImageParser> GetParser() = 0;
 
  private:
+  void Init() {
+    if (!parser_) parser_ = GetParser();
+    if (!decoder_) decoder_ = CreateDecoder(tp_);
+  }
+
   std::shared_ptr<ImageDecoderInstance> decoder_ = nullptr;
   std::shared_ptr<ImageParser> parser_ = nullptr;
   ThreadPool tp_;
