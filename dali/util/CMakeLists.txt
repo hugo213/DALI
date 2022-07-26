@@ -30,7 +30,8 @@ set(DALI_SRCS ${DALI_SRCS}
   "${CMAKE_CURRENT_SOURCE_DIR}/std_file.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/ocv.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/random_crop_generator.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/user_stream.cc")
+  "${CMAKE_CURRENT_SOURCE_DIR}/user_stream.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/numpy.cc")
 
 if (BUILD_CUFILE)
   set(DALI_INST_HDRS ${DALI_INST_HDRS}
