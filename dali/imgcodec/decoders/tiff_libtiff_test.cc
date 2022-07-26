@@ -23,111 +23,45 @@
 #include "dali/core/tensor_shape_print.h"
 #include "dali/core/mm/memory.h"
 #include "dali/core/convert.h"
+#include "dali/imgcodec/decoders/decoder_test_helper.h"
 
 namespace dali {
 namespace imgcodec {
 namespace test {
 
-namespace {
 const auto &dali_extra = dali::testing::dali_extra_path();
-auto img_color   = dali_extra + "/db/single/tiff/0/cat-1245673_640.tiff";
-}  // namespace
+const std::string img_ref_path = dali_extra + "/db/single/reference/tiff/image.tiff.npy";
+const std::string img_path = dali_extra + "/db/single/tiff/image.tiff";
 
-template <typename OutputType>
-class LibTiffDecodeTest : public ::testing::Test {
+class LibTiffDecoderTest : public NumpyDecoderTestBase<uint8_t> {
+ protected:
+  std::shared_ptr<ImageDecoderInstance> CreateDecoder(ThreadPool &tp) override {
+    LibTiffDecoder decoder;
+    return decoder.Create(CPU_ONLY_DEVICE_ID, tp);
+  }
+  std::shared_ptr<ImageParser> GetParser() override {
+    return std::make_shared<TiffParser>();
+  }
 };
 
-using DecodeOutputTypes = ::testing::Types<uint8_t>;  // TODO(skarpinski) Add more types here
-TYPED_TEST_SUITE(LibTiffDecodeTest, DecodeOutputTypes);
-
-TYPED_TEST(LibTiffDecodeTest, Decode) {
-  using OutputType = TypeParam;
-
-  ThreadPool tp(4, CPU_ONLY_DEVICE_ID, false, "LibTiff decoder test");
-  LibTiffDecoder decoder;
-  auto filename = img_color;
-  auto source = ImageSource::FromFilename(filename);
-  auto instance = decoder.Create(CPU_ONLY_DEVICE_ID, tp);
-  ASSERT_NE(instance, nullptr);
-
-  TiffParser parser;
-  EXPECT_TRUE(parser.CanParse(&source));
-  ImageInfo info = parser.GetInfo(&source);
-  DecodeParams params;
-  int64_t n = volume(info.shape);
-  ASSERT_GE(n, 0);
-  ASSERT_LE(n, 100000000);  // sanity check - less than 100M elements
-  auto mem = mm::alloc_raw_unique<OutputType, mm::memory_kind::host>(n);
-  SampleView<CPUBackend> sv(mem.get(), info.shape, type2id<OutputType>::value);
-  auto result = instance->Decode(sv, &source, params);
-  if (result.exception) {
-    EXPECT_NO_THROW(std::rethrow_exception(result.exception));
-  }
-  ASSERT_TRUE(result.success);
-
-  cv::Mat m = cv::imread(filename, cv::IMREAD_COLOR | cv::IMREAD_IGNORE_ORIENTATION);
-  cv::cvtColor(m, m, cv::COLOR_BGR2RGB);
-  int64_t out_row_stride = info.shape[1] * info.shape[2];
-  for (int y = 0; y < m.rows; y++) {
-    const OutputType *out_row = sv.data<OutputType>() + y * out_row_stride;
-    const uint8_t *ref_row = m.ptr<uint8_t>(y);
-    for (int x = 0; x < m.cols; x++) {
-      for (int c = 0; c < 3; c++) {
-        ASSERT_EQ(out_row[3*x + c], ConvertSatNorm<OutputType>(ref_row[3*x + c]))
-          << " at " << x << ", " << y << ", " << c;
-      }
-    }
-  }
+TEST_F(LibTiffDecoderTest, Test) {
+  auto ref = ReadReference(img_ref_path);
+  auto src = ImageSource::FromFilename(img_path);
+  auto img = Decode(&src);
+  AssertEqual(img, ref);
 }
 
-
-TYPED_TEST(LibTiffDecodeTest, DecodeROI) {
-  using OutputType = TypeParam;
-
-  ThreadPool tp(4, CPU_ONLY_DEVICE_ID, false, "LibTiff decoder test");
-  LibTiffDecoder decoder;
-  auto fname = img_color;
-  auto source = ImageSource::FromFilename(fname);
-  auto instance = decoder.Create(CPU_ONLY_DEVICE_ID, tp);
-  ASSERT_NE(instance, nullptr);
-
-  TiffParser parser;
-  EXPECT_TRUE(parser.CanParse(&source));
-  ImageInfo info = parser.GetInfo(&source);
+TEST_F(LibTiffDecoderTest, TestROI) {
+  auto ref = ReadReference(img_ref_path);
+  auto src = ImageSource::FromFilename(img_path);
+  auto info = GetInfo(&src);
 
   DecodeParams params;
   params.use_roi = true;
-  params.roi.begin = { 13, 17 };
-  params.roi.end = { info.shape[0] - 23, info.shape[1] - 19 };
-  TensorShape<> out_shape;
-  out_shape = shape_cat(params.roi.shape(), 3);
-  int64_t n = volume(out_shape);
-  ASSERT_GE(n, 0);
-  ASSERT_LE(n, 100000000);  // sanity check - less than 100M elements
-  auto mem = mm::alloc_raw_unique<OutputType, mm::memory_kind::host>(n);
-  SampleView<CPUBackend> sv(mem.get(), out_shape, type2id<OutputType>::value);
-  auto result = instance->Decode(sv, &source, params);
-  if (result.exception) {
-    EXPECT_NO_THROW(std::rethrow_exception(result.exception));
-  }
-  ASSERT_TRUE(result.success);
-
-  cv::Mat m = cv::imread(fname, cv::IMREAD_COLOR | cv::IMREAD_IGNORE_ORIENTATION);
-  cv::Rect roi_rect(cv::Point2i(params.roi.begin[1], params.roi.begin[0]),
-                    cv::Point2i(params.roi.end[1],   params.roi.end[0]));
-  m = m(roi_rect);
-  cv::cvtColor(m, m, cv::COLOR_BGR2RGB);
-  int64_t out_row_stride = out_shape[1] * out_shape[2];
-  for (int y = 0; y < m.rows; y++) {
-    const OutputType *out_row = sv.data<OutputType>() + y * out_row_stride;
-    const uint8_t *ref_row = m.ptr<uint8_t>(y);
-    for (int x = 0; x < m.cols; x++) {
-      for (int c = 0; c < 3; c++) {
-        ASSERT_EQ(out_row[3*x + c], ConvertSatNorm<OutputType>(ref_row[3*x + c]))
-          << " at " << x << ", " << y << ", " << c;
-      }
-    }
-  }
+  params.roi.begin = {13, 17, 0};
+  params.roi.end = {info.shape[0] - 55, info.shape[1] - 10, 3};
+  auto img = Decode(&src, params);
+  AssertEqual(img, Crop(ref, params.roi.begin, params.roi.shape()));
 }
 
 }  // namespace test
