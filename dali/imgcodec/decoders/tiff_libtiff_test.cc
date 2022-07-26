@@ -29,9 +29,11 @@ namespace dali {
 namespace imgcodec {
 namespace test {
 
+namespace {
 const auto &dali_extra = dali::testing::dali_extra_path();
-std::string img_ref_path = dali_extra + "/db/single/reference/tiff/0/cat-111793_640.tiff.npy";
-std::string img_path = dali_extra + "/db/single/tiff/0/cat-111793_640.tiff";
+auto img_ref_path = dali_extra + "/db/single/reference/tiff/0/cat-111793_640.tiff.npy";
+auto img_path = dali_extra + "/db/single/tiff/0/cat-111793_640.tiff";
+}  // namespace
 
 class LibTiffDecoderTest : public NumpyDecoderTestBase<uint8_t> {
  protected:
