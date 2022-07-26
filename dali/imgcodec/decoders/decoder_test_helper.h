@@ -17,6 +17,7 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 #include "dali/pipeline/data/tensor.h"
 #include "dali/core/static_switch.h"
 #include "dali/pipeline/data/views.h"
