@@ -38,18 +38,16 @@ class CpuDecoderTestBase : public ::testing::Test {
   CpuDecoderTestBase() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
 
   Tensor<CPUBackend> Decode(ImageSource *src, const DecodeParams &opts = {}) {
-    Init();
-
-    EXPECT_TRUE(parser_->CanParse(src));
-    ImageInfo info = parser_->GetInfo(src);
+    EXPECT_TRUE(Parser()->CanParse(src));
+    ImageInfo info = Parser()->GetInfo(src);
 
     Tensor<CPUBackend> result;
-    EXPECT_TRUE(decoder_->CanDecode(src, opts));
+    EXPECT_TRUE(Decoder()->CanDecode(src, opts));
     TensorShape<> shape = (opts.use_roi ? opts.roi.shape() : info.shape);
     result.Resize(shape, type2id<OutputType>::value);
 
     SampleView<CPUBackend> view(result.raw_mutable_data(), result.shape(), result.type());
-    DecodeResult decode_result = decoder_->Decode(view, src, opts);
+    DecodeResult decode_result = Decoder()->Decode(view, src, opts);
     EXPECT_TRUE(decode_result.success);
 
     return result;
@@ -86,9 +84,14 @@ class CpuDecoderTestBase : public ::testing::Test {
     return output;
   }
 
-  ImageInfo GetInfo(ImageSource *src) {
-    Init();
-    return parser_->GetInfo(src);
+  std::shared_ptr<ImageParser> Parser() {
+    if (!parser_) parser_ = CreateParser();
+    return parser_;
+  }
+
+  std::shared_ptr<ImageDecoderInstance> Decoder() {
+    if (!decoder_) decoder_ = CreateDecoder(tp_);
+    return decoder_;
   }
 
   Tensor<CPUBackend> ReadReferenceFrom(const std::string &reference_path) {
@@ -100,14 +103,9 @@ class CpuDecoderTestBase : public ::testing::Test {
 
  protected:
   virtual std::shared_ptr<ImageDecoderInstance> CreateDecoder(ThreadPool &tp) = 0;
-  virtual std::shared_ptr<ImageParser> GetParser() = 0;
+  virtual std::shared_ptr<ImageParser> CreateParser() = 0;
 
  private:
-  void Init() {
-    if (!parser_) parser_ = GetParser();
-    if (!decoder_) decoder_ = CreateDecoder(tp_);
-  }
-
   std::shared_ptr<ImageDecoderInstance> decoder_ = nullptr;
   std::shared_ptr<ImageParser> parser_ = nullptr;
   ThreadPool tp_;

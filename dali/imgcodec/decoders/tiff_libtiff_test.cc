@@ -41,7 +41,7 @@ class LibTiffDecoderTest : public NumpyDecoderTestBase<uint8_t> {
     LibTiffDecoder decoder;
     return decoder.Create(CPU_ONLY_DEVICE_ID, tp);
   }
-  std::shared_ptr<ImageParser> GetParser() override {
+  std::shared_ptr<ImageParser> CreateParser() override {
     return std::make_shared<TiffParser>();
   }
 };
@@ -56,7 +56,7 @@ TEST_F(LibTiffDecoderTest, Test) {
 TEST_F(LibTiffDecoderTest, TestROI) {
   auto ref = ReadReferenceFrom(img_ref_path);
   auto src = ImageSource::FromFilename(img_path);
-  auto info = GetInfo(&src);
+  auto info = Parser()->GetInfo(&src);
 
   DecodeParams params;
   params.use_roi = true;
