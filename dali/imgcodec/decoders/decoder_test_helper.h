@@ -32,11 +32,19 @@ namespace dali {
 namespace imgcodec {
 namespace test {
 
+/**
+* @brief Base class template for tests comparing decoder's results with reference images.
+*
+* @tparam OutputType Type, to which the image should be decoded.
+*/
 template<typename OutputType>
 class CpuDecoderTestBase : public ::testing::Test {
  public:
   CpuDecoderTestBase() : tp_(4, CPU_ONLY_DEVICE_ID, false, "Decoder test") {}
 
+  /**
+  * @brief Decodes an image and returns the result as a tensor.
+  */
   Tensor<CPUBackend> Decode(ImageSource *src, const DecodeParams &opts = {}) {
     EXPECT_TRUE(Parser()->CanParse(src));
     ImageInfo info = Parser()->GetInfo(src);
@@ -53,6 +61,9 @@ class CpuDecoderTestBase : public ::testing::Test {
     return result;
   }
 
+  /**
+  * @brief Checks if two tensors are equal.
+  */
   void AssertEqual(const Tensor<CPUBackend> &img, const Tensor<CPUBackend> &ref) {
     EXPECT_EQ(img.shape(), ref.shape()) << "Different shapes";
     auto img_view = view<const OutputType>(img), ref_view = view<const OutputType>(ref);
@@ -62,6 +73,10 @@ class CpuDecoderTestBase : public ::testing::Test {
     }
   }
 
+  /**
+  * @brief Crops a tensor to specified roi_shape, anchored at roi_begin.
+  * Does not support padding.
+  */
   Tensor<CPUBackend> Crop(const Tensor<CPUBackend> &input,
                           const TensorShape<> &roi_begin, const TensorShape<> &roi_shape) {
     int ndim = input.shape().sample_dim();
@@ -84,25 +99,44 @@ class CpuDecoderTestBase : public ::testing::Test {
     return output;
   }
 
+  /**
+  * @brief Returns the parser used.
+  */
   std::shared_ptr<ImageParser> Parser() {
     if (!parser_) parser_ = CreateParser();
     return parser_;
   }
 
+  /**
+  * @brief Returns the decoder used.
+  */
   std::shared_ptr<ImageDecoderInstance> Decoder() {
     if (!decoder_) decoder_ = CreateDecoder(tp_);
     return decoder_;
   }
 
+  /**
+  * @brief Reads the reference image from specified path and returns it as a tensor.
+  */
   Tensor<CPUBackend> ReadReferenceFrom(const std::string &reference_path) {
     auto src = FileStream::Open(reference_path, false, false);
     return ReadReference(src.get());
   }
 
+  /**
+  * @brief Reads the reference image from specified stream.
+  */
   virtual Tensor<CPUBackend> ReadReference(InputStream *src) = 0;
 
  protected:
+  /**
+  * @brief Creates a decoder instance, working on a specified thread pool.
+  */
   virtual std::shared_ptr<ImageDecoderInstance> CreateDecoder(ThreadPool &tp) = 0;
+
+  /**
+  * @brief Creates a parser to be used.
+  */
   virtual std::shared_ptr<ImageParser> CreateParser() = 0;
 
  private:
@@ -112,9 +146,17 @@ class CpuDecoderTestBase : public ::testing::Test {
 };
 
 
+/**
+* @brief Base class template for tests comparing decoder's results with numpy files.
+*
+* @tparam OutputType Type, to which the image should be decoded.
+*/
 template<typename OutputType>
 class NumpyDecoderTestBase : public CpuDecoderTestBase<OutputType> {
  private:
+  /**
+  * @brief Converts a tensor to OutputType.
+  */
   template<typename InputType>
   Tensor<CPUBackend> Convert(const Tensor<CPUBackend> &in) {
     Tensor<CPUBackend> out;
@@ -126,6 +168,9 @@ class NumpyDecoderTestBase : public CpuDecoderTestBase<OutputType> {
     return out;
   }
 
+  /**
+  * @brief Reads a tensor from numpy file.
+  */
   Tensor<CPUBackend> ReadNumpy(InputStream *src) {
     numpy::HeaderData header = numpy::ParseHeader(src);
     src->SeekRead(header.data_offset, SEEK_SET);
