@@ -30,8 +30,8 @@ namespace imgcodec {
 namespace test {
 
 const auto &dali_extra = dali::testing::dali_extra_path();
-const std::string img_ref_path = dali_extra + "/db/single/reference/tiff/0/cat-111793_640.tiff.npy";
-const std::string img_path = dali_extra + "/db/single/tiff/0/cat-111793_640.tiff";
+std::string img_ref_path = dali_extra + "/db/single/reference/tiff/0/cat-111793_640.tiff.npy";
+std::string img_path = dali_extra + "/db/single/tiff/0/cat-111793_640.tiff";
 
 class LibTiffDecoderTest : public NumpyDecoderTestBase<uint8_t> {
  protected:
