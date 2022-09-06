@@ -290,6 +290,7 @@ DecodeResult LibTiffDecoderInstance::Decode(DecodeContext ctx,
   TensorShape<> in_line_strides = kernels::GetStrides(in_line_shape);
   TensorShape<> out_line_shape = {roi.shape()[1], out_channels};
   TensorShape<> out_line_strides = kernels::GetStrides(out_line_shape);
+  TensorShape<> scanline_shape = {info.image_width, info.channels};
 
   // We choose smallest possible type
   size_t in_type_bits = 0;
@@ -309,14 +310,14 @@ DecodeResult LibTiffDecoderInstance::Decode(DecodeContext ctx,
         row_in = static_cast<InputType *>(row_buf.get());
       } else {
         row_in = static_cast<InputType*>(scratchpad.Alloc(mm::memory_kind_id::host,
-                   volume(in_line_shape) * sizeof(InputType), sizeof(InputType)));
+                   volume(scanline_shape) * sizeof(InputType), sizeof(InputType)));
       }
 
       OutType *const img_out = out.mutable_data<OutType>();
       for (int64_t roi_y = 0; roi_y < roi.shape()[0]; roi_y++) {
         LIBTIFF_CALL(TIFFReadScanline(tiff.get(), row_buf.get(), roi.begin[0] + roi_y, 0));
         if (info.bit_depth != InTypeBits) {
-          detail::UnpackBits(info.bit_depth, row_in, row_buf.get(), volume(in_line_shape));
+          detail::UnpackBits(info.bit_depth, row_in, row_buf.get(), volume(scanline_shape));
         }
         Convert(img_out + (roi_y * out_row_stride), out_line_strides.data(), 1, opts.format,
                 row_in + roi.begin[1] * info.channels, in_line_strides.data(), 1, in_format,
