@@ -76,8 +76,8 @@ __global__ void BinSearchCastKernel(const CastSampleDesc *samples,
 }
 
 template <typename OType, typename IType>
-__global__ void DirectCastKernel(DirectCastKernelParamPack param_pack, int nsamples,
-                                 int block_volume_scale) {
+__global__ void DirectCastKernel(const __grid_constant__ DirectCastKernelParamPack param_pack,
+                                 int nsamples, int block_volume_scale) {
   const auto& samples = param_pack.samples;
   const auto& blocks = param_pack.blocks;
 
