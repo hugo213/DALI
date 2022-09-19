@@ -96,6 +96,25 @@ union PackedBuffer {
   }
 };
 
+template <int Dims>
+__device__ __forceinline__ uint64_t sliceMapper(uint64_t idx, const fast_div<uint64_t> *out_strides, const int64_t *in_strides) {
+  /* Extracted from SliceFuncNoPad without changes */
+  uint64_t in_idx = 0;
+
+  #pragma unroll
+  for (int d = 0; d < Dims; d++) {
+    int i_d = div_mod(idx, idx, out_strides[d]);
+    in_idx += i_d * in_strides[d];
+  }
+  in_idx += idx;  // remaining dims have equal strides
+  return in_idx;
+}
+
+__device__ __forceinline__ void prefetch_l1 (const void* addr)
+{
+  asm volatile("prefetch.global.L1 [ %0 ];":: "l"(addr));
+}
+
 /**
  * @brief Simplified algorithm when no padding is necessary
  * @remarks `in` already refers to the slice anchor start
@@ -111,7 +130,13 @@ __device__ void SliceFuncNoPad(OutputType *__restrict__ out, const InputType *__
     return;
   }
 
-  for (; offset < block_end; offset += blockDim.x * PackedBuffer<OutputType>::kCapacity) {
+  uint64_t stride = blockDim.x * PackedBuffer<OutputType>::kCapacity;
+
+  auto m1 = sliceMapper<Dims>(stride, out_strides, in_strides);
+  auto m2 = sliceMapper<Dims>(2*stride, out_strides, in_strides) - sliceMapper<Dims>(stride, out_strides, in_strides);
+  auto prefetch_dist = m1 < m2 ? m2 : m1;
+
+  for (; offset < block_end; offset += stride) {
     PackedBuffer<OutputType> result;
 
     uint64_t i;
@@ -119,14 +144,8 @@ __device__ void SliceFuncNoPad(OutputType *__restrict__ out, const InputType *__
     for (i = 0; i < PackedBuffer<OutputType>::kCapacity; i++) {
       uint64_t idx = offset + i;
       if (idx >= block_end) break;
-      uint64_t in_idx = 0;
-
-      #pragma unroll
-      for (int d = 0; d < Dims; d++) {
-        int i_d = div_mod(idx, idx, out_strides[d]);
-        in_idx += i_d * in_strides[d];
-      }
-      in_idx += idx;  // remaining dims have equal strides
+      uint64_t in_idx = sliceMapper<Dims>(idx, out_strides, in_strides);
+      if (i == 0) prefetch_l1((void*)(&in[in_idx + prefetch_dist]));
       result.values[i] = clamp<OutputType>(in[in_idx]);
     }
     result.store(&out[offset], i);
