@@ -160,7 +160,7 @@ class DLL_PUBLIC OperatorBase {
    * Is called exactly once per epoch.
   */
   virtual void SaveState(OpCheckpoint &cpt, AccessOrder order) {
-    DALI_FAIL("Checkpointing is not implemented for this operator.");
+    DALI_FAIL(make_string("Checkpointing is not implemented for this operator: ", spec_.name()));
   }
 
   /**
@@ -171,7 +171,7 @@ class DLL_PUBLIC OperatorBase {
    * Implementation can be blocking, as the performance is not critical.
   */
   virtual void RestoreState(const OpCheckpoint &cpt) {
-    DALI_FAIL("Checkpointing is not implemented for this operator.");
+    DALI_FAIL(make_string("Checkpointing is not implemented for this operator: ", spec_.name()));
   }
 
   /**
@@ -180,14 +180,14 @@ class DLL_PUBLIC OperatorBase {
    * Passed OpCheckpoint should have the host access order.
   */
   virtual std::string SerializeCheckpoint(const OpCheckpoint &cpt) const {
-    DALI_FAIL("Checkpointing is not implemented for this operator.");
+    DALI_FAIL(make_string("Checkpointing is not implemented for this operator: ", spec_.name()));
   }
 
   /**
    * @brief Deserializes serialized operator state and sets it in the passed OpCheckpoint.
   */
   virtual void DeserializeCheckpoint(OpCheckpoint &cpt, const std::string &data) const {
-    DALI_FAIL("Checkpointing is not implemented for this operator.");
+    DALI_FAIL(make_string("Checkpointing is not implemented for this operator: ", spec_.name()));
   }
 
  protected:
