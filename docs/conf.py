@@ -160,7 +160,7 @@ pygments_style = "sphinx"
 
 # Mock some of the dependencies for building docs. tf-plugin doc check tf version before loading,
 # so we do not mock tensorflow so we do not need to extend the logic there.
-autodoc_mock_imports = ["paddle", "torch", "torchvision"]
+autodoc_mock_imports = ["paddle", "torch", "torchvision", "mxnet"]
 
 
 # -- Options for MathJax -----------------------------------------------------
